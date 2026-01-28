@@ -2,7 +2,9 @@
 Модуль для загрузки и валидации конфигурации проекта.
 Использует Pydantic для чтения переменных окружения из файла .env.
 """
-from typing import ClassVar
+from typing import ClassVar, Optional
+from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, field_validator, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,10 +53,11 @@ class Settings(BaseSettings):
 
         return value
 
-
+@lru_cache()
 def get_settings() -> Settings:
     """
     Фабричная функция для создания и получения экземпляра настроек.
+    Использует кэширование, чтобы избежать многократного чтения .env файла.
     Выбрасывает исключение `ValidationError` с подробным сообщением при ошибке.
 
     Возвращает:
@@ -65,6 +68,7 @@ def get_settings() -> Settings:
     """
     try:
         return Settings()
+
     except ValidationError as e:
         # Формируем более читабельное сообщение об ошибке
         error_messages = []

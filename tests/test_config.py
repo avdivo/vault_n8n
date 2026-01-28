@@ -27,6 +27,10 @@ def clear_env_vars() -> Generator[None, None, None]:
         if key in os.environ:
             del os.environ[key]
 
+    # Очищаем кэш get_settings перед каждым тестом
+    from app import config
+    config.get_settings.cache_clear()
+
     yield
 
     # Восстанавливаем исходные значения после теста
@@ -35,6 +39,9 @@ def clear_env_vars() -> Generator[None, None, None]:
             os.environ[key] = value
         elif key in os.environ:
             del os.environ[key]
+    
+    # Очищаем кэш после теста на всякий случай
+    config.get_settings.cache_clear()
 
 
 def test_successful_config_loading(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,8 +79,7 @@ def test_missing_auth_token_raises_error(monkeypatch: pytest.MonkeyPatch) -> Non
 
     with pytest.raises(ValueError, match="Переменная 'AUTH_TOKEN'"):
         from app import config
-        import importlib
-        importlib.reload(config)
+        monkeypatch.setitem(config.Settings.model_config, 'env_file', None)
         config.get_settings()
 
 
@@ -88,8 +94,7 @@ def test_missing_encryption_key_raises_error(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(ValueError, match="Переменная 'ENCRYPTION_KEY'"):
         from app import config
-        import importlib
-        importlib.reload(config)
+        monkeypatch.setitem(config.Settings.model_config, 'env_file', None)
         config.get_settings()
 
 
@@ -118,8 +123,7 @@ def test_invalid_encryption_key_raises_error(
 
     with pytest.raises(ValueError, match=error_message):
         from app import config
-        import importlib
-        importlib.reload(config)
+        monkeypatch.setitem(config.Settings.model_config, 'env_file', None)
         config.get_settings()
 
 def test_default_database_path(monkeypatch: pytest.MonkeyPatch) -> None:

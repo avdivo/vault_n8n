@@ -2,3 +2,6 @@ fastapi
 pydantic
 pydantic-settings
 pytest
+cryptography
+httpx
+uvicorn
