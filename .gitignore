@@ -1,3 +1,5 @@
 prompts/
 app.log
 .env
+secrets.db
+__pycache__/
