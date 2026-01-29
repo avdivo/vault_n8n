@@ -2,7 +2,9 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ "main" ]
+    # Запускать воркфлоу при создании тегов, которые начинаются с 'v' (например, v1.0, v1.0.1)
+    tags:
+      - 'v*.*.*'
 
 jobs:
   build-and-push:
@@ -16,10 +18,21 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Extract metadata (tags, labels) for Docker
+        # Этот шаг автоматически извлечет тег из Git (например, v1.0.1)
+        # и подготовит его для использования в следующем шаге.
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/vault-n8n
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/vault-n8n:latest
+          # Используем теги, сгенерированные на предыдущем шаге.
+          # Это присвоит образу два тега: номер версии и 'latest'.
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
