@@ -2,7 +2,7 @@
 Тесты для модуля шифрования `app.crypto`.
 """
 import pytest
-from app.crypto import encrypt_data, decrypt_data
+from app.crypto import encrypt_data, decrypt_data, DecryptionError
 from cryptography.exceptions import InvalidTag
 import os
 
@@ -30,7 +30,7 @@ def test_decrypt_with_incorrect_key() -> None:
     # Генерируем другой ключ
     incorrect_key = os.urandom(32).hex()
 
-    with pytest.raises(ValueError, match="Ошибка дешифрования или аутентификации данных"):
+    with pytest.raises(DecryptionError, match="Ошибка аутентификации данных"):
         decrypt_data(encrypted_data, incorrect_key)
 
 def test_decrypt_with_corrupted_data() -> None:
@@ -47,7 +47,7 @@ def test_decrypt_with_corrupted_data() -> None:
     corrupted_encrypted_data = f"{parts[0]}.{parts[1]}.{corrupted_ciphertext}.{parts[3]}"
 
 
-    with pytest.raises(ValueError, match="Ошибка дешифрования или аутентификации данных"):
+    with pytest.raises(DecryptionError, match="Ошибка аутентификации данных"):
         decrypt_data(corrupted_encrypted_data, TEST_ENCRYPTION_KEY)
 
 def test_decrypt_with_invalid_format() -> None:
@@ -55,9 +55,9 @@ def test_decrypt_with_invalid_format() -> None:
     Проверяет, что дешифрование данных в некорректном формате приводит к ошибке.
     """
     invalid_format_data = "part1.part2.part3"  # Не хватает одной части
-    with pytest.raises(ValueError, match="Некорректный формат зашифрованных данных"):
+    with pytest.raises(DecryptionError, match="Некорректный формат зашифрованных данных"):
         decrypt_data(invalid_format_data, TEST_ENCRYPTION_KEY)
 
     invalid_base64_data = "invalid-base64-!.invalid-base64-!.invalid-base64-!.invalid-base64-!"
-    with pytest.raises(ValueError, match="Ошибка декодирования base64 частей зашифрованных данных"):
+    with pytest.raises(DecryptionError, match="Ошибка декодирования base64 частей зашифрованных данных"):
         decrypt_data(invalid_base64_data, TEST_ENCRYPTION_KEY)
