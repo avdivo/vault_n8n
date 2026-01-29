@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   vault_n8n:
+    container_name: vault-n8n
     build: .
     env_file:
       - ./.env
