@@ -10,6 +10,7 @@ from app.api import routes as api_routes
 from app.config import get_settings, Settings
 from app.db import init_db
 from app.utils import setup_logging
+from app.startup import check_encryption_key
 
 # Настраиваем логирование на старте модуля
 setup_logging()
@@ -29,8 +30,12 @@ async def lifespan(app: FastAPI):
             settings = get_settings()
         
         init_db(settings.DATABASE_PATH)
+        check_encryption_key(settings) # Проверка ключа шифрования
+        
         app.state.settings = settings
     except Exception as e:
+        # sys.exit(1) в check_encryption_key не будет пойман здесь,
+        # но другие исключения будут залогированы.
         logging.critical(f"Критическая ошибка при инициализации: {e}")
         raise
     yield

@@ -5,7 +5,7 @@
 import sqlite3
 import logging
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 # Инициализация логгера
 logger = logging.getLogger(__name__)
@@ -172,4 +172,26 @@ def delete_secrets_by_keys(db_path: Union[str, Path], keys: List[str]) -> int:
             return deleted_count
     except sqlite3.Error as e:
         logger.error(f"Ошибка при удалении секретов по ключам: {e}")
+        raise
+
+def get_first_secret_value(db_path: Union[str, Path]) -> Optional[str]:
+    """
+    Извлекает значение первого секрета из базы данных.
+    Используется для проверки ключа шифрования при старте.
+    """
+    db_path = _to_path(db_path)
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM secrets LIMIT 1;")
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+            return None
+    except sqlite3.Error as e:
+        # Если таблицы еще нет, это не ошибка на данном этапе
+        if "no such table" in str(e):
+            logger.info("Таблица 'secrets' еще не создана, проверка ключа не требуется.")
+            return None
+        logger.error(f"Ошибка при получении первого секрета из БД: {e}")
         raise
