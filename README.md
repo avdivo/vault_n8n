@@ -81,18 +81,30 @@ VaultN8N — это минималистичное серверное прило
 -   **`ENCRYPTION_KEY`**: (Обязательно) 64-символьный hex-ключ для шифрования данных.
 -   **`DATABASE_PATH`**: (Опционально) Путь к файлу базы данных SQLite. По умолчанию: `./secrets.db`.
 
-## Использование API (Примеры Curl)
+## Использование API
 
-Все эндпоинты имеют префикс `/api/v1` и требуют авторизации.
+Все эндпоинты имеют префикс `/api/v1` и требуют Bearer-авторизации.
 
-> **Важно:** В примерах ниже используется плейсхолдер `your_secret_token`. Вы должны заменить его на ваш собственный `AUTH_TOKEN`, который был сгенерирован и сохранен в файле `.env`.
+> **Важно:** В примерах ниже используется переменная `$AUTH_TOKEN`. Перед выполнением команд вы должны заменить ее на ваш собственный `AUTH_TOKEN` из `.env` файла или определить ее в терминале:
+> ```bash
+> AUTH_TOKEN=$(grep AUTH_TOKEN .env | cut -d '=' -f2)
+> ```
 
-**Пример получения вашего токена из `.env`:**
-```bash
-AUTH_TOKEN=$(grep AUTH_TOKEN .env | cut -d '=' -f2)
+---
+
+### `POST /api/v1/secrets/single`
+
+**Назначение:** Создание или обновление одного секрета. Если секрет с указанным ключом уже существует, его значение будет перезаписано.
+
+**Входные данные (JSON Body):**
+```json
+{
+  "key": "my_service_password",
+  "value": "super_secret_password_123"
+}
 ```
 
-#### Добавление/Обновление секрета
+**Пример запроса:**
 ```bash
 curl -X POST "http://localhost:8000/api/v1/secrets/single" \
      -H "Content-Type: application/json" \
@@ -100,17 +112,157 @@ curl -X POST "http://localhost:8000/api/v1/secrets/single" \
      -d '{ "key": "my_service_password", "value": "super_secret_password_123" }'
 ```
 
-#### Получение секретов
+**Пример успешного ответа (JSON):**
+```json
+[
+  {
+    "key": "my_service_password",
+    "value": "super_secret_password_123"
+  }
+]
+```
+
+---
+
+### `POST /api/v1/secrets/bulk`
+
+**Назначение:** Массовое создание или обновление нескольких секретов.
+
+**Входные данные (JSON Body):** Массив объектов, каждый из которых представляет секрет.
+```json
+[
+  { "key": "api_key_prod", "value": "prod_api_token_xyz" },
+  { "key": "db_user", "value": "admin_user" }
+]
+```
+
+**Пример запроса:**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/secrets?keys=my_service_password,api_key_prod" \
+curl -X POST "http://localhost:8000/api/v1/secrets/bulk" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer $AUTH_TOKEN" \
+     -d '[ { "key": "api_key_prod", "value": "prod_api_token_xyz" }, { "key": "db_user", "value": "admin_user" } ]'
+```
+
+**Пример успешного ответа (JSON):**
+```json
+[
+  {
+    "key": "api_key_prod",
+    "value": "prod_api_token_xyz"
+  },
+  {
+    "key": "db_user",
+    "value": "admin_user"
+  }
+]
+```
+
+---
+
+### `GET /api/v1/secrets`
+
+**Назначение:** Получение одного или нескольких секретов по ключам.
+
+**Входные данные (Query-параметр):**
+- `keys`: Строка, содержащая один или несколько ключей, разделенных запятыми.
+- **Фильтрация по маске:** Вы можете использовать символ `*` в качестве wildcard для поиска по шаблону.
+
+**Примеры использования параметра `keys`:**
+- `?keys=my_secret_key` — найти один конкретный ключ.
+- `?keys=key1,key2,key3` — найти три конкретных ключа.
+- `?keys=service_A_*` — найти все ключи, начинающиеся с `service_A_`.
+- `?keys=key1,service_B_*` — найти ключ `key1` и все ключи, начинающиеся с `service_B_`.
+
+**Пример запроса:**
+```bash
+curl -X GET "http://localhost:8000/api/v1/secrets?keys=my_service_password,api_key_*" \
      -H "Authorization: Bearer $AUTH_TOKEN"
 ```
 
-#### Удаление секретов
+**Пример успешного ответа (JSON):**
+(Возвращаются только найденные секреты)
+```json
+[
+  {
+    "key": "my_service_password",
+    "value": "super_secret_password_123"
+  }
+]
+```
+
+---
+
+### `DELETE /api/v1/secrets`
+
+**Назначение:** Удаление одного или нескольких секретов по ключам или маске.
+
+**Входные данные (Query-параметр):**
+- `keys`: Строка, содержащая один или несколько ключей/масок для удаления (правила те же, что и для `GET`).
+
+**Пример запроса:**
 ```bash
-curl -X DELETE "http://localhost:8000/api/v1/secrets?keys=my_service_password" \
+curl -X DELETE "http://localhost:8000/api/v1/secrets?keys=db_user,api_key_prod" \
      -H "Authorization: Bearer $AUTH_TOKEN"
 ```
+
+**Пример успешного ответа (JSON):**
+(В ответе возвращаются удаленные секреты)
+```json
+[
+  {
+    "key": "db_user",
+    "value": "admin_user"
+  },
+  {
+    "key": "api_key_prod",
+    "value": "prod_api_token_xyz"
+  }
+]
+```
+
+---
+
+### Обработка ошибок
+
+API использует стандартные HTTP-статус-коды для информирования об ошибках.
+
+**`401 Unauthorized`**
+- **Причина:** Неверный или отсутствующий `AUTH_TOKEN`.
+- **Пример ответа:**
+  ```json
+  {
+    "detail": "Неверный токен аутентификации"
+  }
+  ```
+
+**`422 Unprocessable Entity`**
+- **Причина:** Ошибка валидации входных данных. Например, отсутствует обязательное поле в теле запроса, неверный тип данных или невалидный JSON.
+- **Пример ответа (неверное тело в `POST /secrets/single`):**
+  ```json
+  {
+    "detail": [
+      {
+        "loc": [
+          "body",
+          "key"
+        ],
+        "msg": "field required",
+        "type": "value_error.missing"
+      }
+    ]
+  }
+  ```
+
+**`500 Internal Server Error`**
+- **Причина:** Непредвиденная ошибка на стороне сервера (например, проблема с доступом к базе данных).
+- **Пример ответа:**
+  ```json
+  {
+    "detail": "Внутренняя ошибка сервера: <описание_ошибки>"
+  }
+  ```
+> Примечание: в production-среде детальное описание ошибки может быть скрыто из соображений безопасности.
 
 ## Тестирование
 
