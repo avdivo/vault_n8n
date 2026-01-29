@@ -52,11 +52,21 @@ ensure_env_vars() {
         echo "INFO: Создан новый файл .env."
     fi
 
+    # --- Поиск корректной команды python ---
+    PYTHON_CMD="python3"
+    if ! command -v $PYTHON_CMD &> /dev/null; then
+        PYTHON_CMD="python"
+        if ! command -v $PYTHON_CMD &> /dev/null; then
+            echo "ERROR: Python не установлен. Пожалуйста, установите Python 3."
+            exit 1
+        fi
+    fi
+
     # Проверяем наличие AUTH_TOKEN
     AUTH_TOKEN_VALUE=$(grep -E "^AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2)
     if [ -z "$AUTH_TOKEN_VALUE" ]; then
         echo "INFO: AUTH_TOKEN не найден. Генерируется новый..."
-        AUTH_TOKEN=$(python -c 'import secrets; print(secrets.token_hex(16))')
+        AUTH_TOKEN=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(16))')
         echo "AUTH_TOKEN=$AUTH_TOKEN" >> "$ENV_FILE"
         display_token_box "AUTH_TOKEN" "$AUTH_TOKEN" "Сохраните этот токен! Он нужен для доступа к API."
     fi
@@ -65,7 +75,7 @@ ensure_env_vars() {
     ENCRYPTION_KEY_VALUE=$(grep -E "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2)
     if [ -z "$ENCRYPTION_KEY_VALUE" ]; then
         echo "INFO: ENCRYPTION_KEY не найден. Генерируется новый..."
-        ENCRYPTION_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')
+        ENCRYPTION_KEY=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(32))')
         echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> "$ENV_FILE"
         display_token_box "ENCRYPTION_KEY" "$ENCRYPTION_KEY" "Сохраните этот ключ! Он нужен для шифрования данных. Без него вы потеряете все данные."
     fi
