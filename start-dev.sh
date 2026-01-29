@@ -91,21 +91,35 @@ echo "INFO: Файл .env готов."
 echo "INFO: Важно! Сохраните сгенерированные токены/ключи из .env файла в безопасном месте."
 echo "INFO: Без ENCRYPTION_KEY вы не сможете расшифровать свои секреты!"
 
-# 2. Проверка наличия docker-compose
+# 2. Проверка и подготовка файла базы данных
+DB_FILE="secrets.db"
+# Проверяем, не является ли 'secrets.db' директорией
+if [ -d "$DB_FILE" ]; then
+    echo "ОШИБКА: '$DB_FILE' существует, но является директорией." >&2
+    echo "Это могло произойти из-за некорректного предыдущего запуска Docker." >&2
+    echo "Пожалуйста, удалите эту директорию командой: rm -r $DB_FILE" >&2
+    echo "Затем повторно запустите этот скрипт." >&2
+    exit 1
+fi
+# Убедимся, что файл базы данных существует на хосте.
+# Если его нет, создаем. Если он есть, touch просто обновит время модификации.
+touch "$DB_FILE"
+
+# 3. Проверка наличия docker-compose
 if ! command -v docker-compose &> /dev/null; then
-    echo "ERROR: docker-compose не найден. Пожалуйста, установите Docker и docker-compose."
+    echo "ERROR: docker-compose не найден. Пожалуйста, установите Docker и docker-compose." >&2
     exit 1
 fi
 
-# 3. Сборка и запуск контейнера
+# 4. Сборка и запуск контейнера
 echo "INFO: Сборка и запуск Docker-контейнера... (это может занять некоторое время)"
 docker-compose up --build -d
 
-# 4. Проверка статуса
+# 5. Проверка статуса
 if [ $? -eq 0 ]; then
     echo "--- VaultN8N успешно запущен! ---"
     echo "Приложение доступно по адресу http://localhost:8200"
     echo "Документация API (Swagger UI): http://localhost:8200/docs"
 else
-    echo "ERROR: Произошла ошибка при запуске docker-compose. Проверьте логи выше."
+    echo "ERROR: Произошла ошибка при запуске docker-compose. Проверьте логи выше." >&2
 fi

@@ -91,7 +91,7 @@ echo "--- Установка и запуск VaultN8N ---"
 
 # 1. Проверка наличия необходимых утилит (curl, docker-compose)
 if ! command -v curl &> /dev/null || ! command -v docker-compose &> /dev/null; then
-    echo "ERROR: Для работы скрипта необходимы curl и docker-compose."
+    echo "ERROR: Для работы скрипта необходимы curl и docker-compose." >&2
     exit 1
 fi
 
@@ -99,7 +99,7 @@ fi
 echo "INFO: Скачивание файла docker-compose.yml..."
 curl -sSL -o "$COMPOSE_FILE" "$REPO_URL/$COMPOSE_FILE"
 if [ $? -ne 0 ]; then
-    echo "ERROR: Не удалось скачать docker-compose.yml. Проверьте подключение к интернету."
+    echo "ERROR: Не удалось скачать docker-compose.yml. Проверьте подключение к интернету." >&2
     exit 1
 fi
 
@@ -109,7 +109,21 @@ echo "INFO: Файл .env готов."
 echo "INFO: Важно! Сохраните сгенерированные токены/ключи из .env файла в безопасном месте."
 echo "INFO: Без ENCRYPTION_KEY вы не сможете расшифровать свои секреты!"
 
-# 4. Модификация docker-compose.yml для использования образа с Docker Hub
+# 4. Проверка и подготовка файла базы данных
+DB_FILE="secrets.db"
+# Проверяем, не является ли 'secrets.db' директорией
+if [ -d "$DB_FILE" ]; then
+    echo "ОШИБКА: '$DB_FILE' существует, но является директорией." >&2
+    echo "Это могло произойти из-за некорректного предыдущего запуска Docker." >&2
+    echo "Пожалуйста, удалите эту директорию командой: rm -r $DB_FILE" >&2
+    echo "Затем повторно запустите этот скрипт." >&2
+    exit 1
+fi
+# Убедимся, что файл базы данных существует на хосте.
+# Если его нет, создаем. Если он есть, touch просто обновит время модификации.
+touch "$DB_FILE"
+
+# 5. Модификация docker-compose.yml для использования образа с Docker Hub
 # Используем sed для замены блока build на image.
 # `sed -i` для in-place редактирования. Добавляем .bak для совместимости с macOS
 sed -i.bak "s|build: .|image: $DOCKER_IMAGE|" "$COMPOSE_FILE"
@@ -118,16 +132,16 @@ rm -f "${COMPOSE_FILE}.bak"
 
 echo "INFO: docker-compose.yml настроен для использования образа '$DOCKER_IMAGE'."
 
-# 5. Запуск контейнера
+# 6. Запуск контейнера
 echo "INFO: Скачивание последней версии образа и запуск контейнера..."
 docker-compose up -d
 
-# 6. Проверка статуса
+# 7. Проверка статуса
 if [ $? -eq 0 ]; then
     echo "--- VaultN8N успешно запущен! ---"
     echo "Приложение доступно по адресу http://localhost:8200"
     echo "Документация API (Swagger UI): http://localhost:8200/docs"
     echo "Ваши ключи для доступа сохранены в файле .env в текущей директории."
 else
-    echo "ERROR: Произошла ошибка при запуске docker-compose. Проверьте логи выше."
+    echo "ERROR: Произошла ошибка при запуске docker-compose. Проверьте логи выше." >&2
 fi
