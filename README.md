@@ -73,8 +73,10 @@ VaultN8N — это минималистичное серверное прило
     # Запустите приложение
     uvicorn app.main:app --host 0.0.0.0 --port 8000
     ```
+    После запуска приложение будет доступно по адресу `http://localhost:8200`.
 
 ## Конфигурация
+
 
 Приложение конфигурируется через переменные окружения, которые автоматически создаются в файле `.env` при первом запуске с помощью скриптов.
 
@@ -93,6 +95,12 @@ VaultN8N — это минималистичное серверное прило
 
 ---
 
+### Доступ к Swagger UI
+
+Документация API доступна в интерактивном режиме (Swagger UI) по адресу: `http://localhost:8200/docs`. Здесь вы можете просмотреть все доступные эндпоинты, их параметры, модели данных и попробовать выполнить запросы.
+
+---
+
 ### `POST /api/v1/secrets/single`
 
 **Назначение:** Создание или обновление одного секрета. Если секрет с указанным ключом уже существует, его значение будет перезаписано.
@@ -107,7 +115,7 @@ VaultN8N — это минималистичное серверное прило
 
 **Пример запроса:**
 ```bash
-curl -X POST "http://localhost:8000/api/v1/secrets/single" \
+curl -X POST "http://localhost:8200/api/v1/secrets/single" \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer $AUTH_TOKEN" \
      -d '{ "key": "my_service_password", "value": "super_secret_password_123" }'
@@ -139,7 +147,7 @@ curl -X POST "http://localhost:8000/api/v1/secrets/single" \
 
 **Пример запроса:**
 ```bash
-curl -X POST "http://localhost:8000/api/v1/secrets/bulk" \
+curl -X POST "http://localhost:8200/api/v1/secrets/bulk" \
      -H "Content-Type: application/json" \
      -H "Authorization: Bearer $AUTH_TOKEN" \
      -d '[ { "key": "api_key_prod", "value": "prod_api_token_xyz" }, { "key": "db_user", "value": "admin_user" } ]'
@@ -177,7 +185,7 @@ curl -X POST "http://localhost:8000/api/v1/secrets/bulk" \
 
 **Пример запроса:**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/secrets?keys=my_service_password,api_key_*" \
+curl -X GET "http://localhost:8200/api/v1/secrets?keys=my_service_password,api_key_*" \
      -H "Authorization: Bearer $AUTH_TOKEN"
 ```
 
@@ -203,7 +211,7 @@ curl -X GET "http://localhost:8000/api/v1/secrets?keys=my_service_password,api_k
 
 **Пример запроса:**
 ```bash
-curl -X DELETE "http://localhost:8000/api/v1/secrets?keys=db_user,api_key_prod" \
+curl -X DELETE "http://localhost:8200/api/v1/secrets?keys=db_user,api_key_prod" \
      -H "Authorization: Bearer $AUTH_TOKEN"
 ```
 
@@ -269,7 +277,7 @@ API использует стандартные HTTP-статус-коды дл�
 
 Для взаимодействия с VaultN8N из n8n используется узел **HTTP Request**.
 
-> **URL сервиса:** Если n8n и VaultN8N запущены в одной `docker-compose` сети, используйте имя сервиса в качестве хоста: `http://vault_n8n:8000`. В противном случае, используйте внешний IP-адрес или домен.
+> **URL сервиса:** Если n8n и VaultN8N запущены в одной `docker-compose` сети, используйте имя сервиса в качестве хоста: `http://vault_n8n:8200`. В противном случае, используйте внешний IP-адрес или домен.
 
 ### Настройка авторизации
 
@@ -287,7 +295,7 @@ API использует стандартные HTTP-статус-коды дл�
 #### 1. Добавление/Обновление одного секрета
 
 - **Method:** `POST`
-- **URL:** `http://vault_n8n:8000/api/v1/secrets/single`
+- **URL:** `http://vault_n8n:8200/api/v1/secrets/single`
 - **Body Content Type:** `JSON`
 - **JSON:**
   ```json
@@ -307,7 +315,7 @@ API использует стандартные HTTP-статус-коды дл�
 #### 2. Массовое добавление/обновление секретов
 
 - **Method:** `POST`
-- **URL:** `http://vault_n8n:8000/api/v1/secrets/bulk`
+- **URL:** `http://vault_n8n:8200/api/v1/secrets/bulk`
 - **Body Content Type:** `JSON`
 - **JSON:**
   ```json
@@ -320,7 +328,7 @@ API использует стандартные HTTP-статус-коды дл�
 #### 3. Получение секретов
 
 - **Method:** `GET`
-- **URL:** `http://vault_n8n:8000/api/v1/secrets`
+- **URL:** `http://vault_n8n:8200/api/v1/secrets`
 - **Options -> Query Parameters:**
   - Нажмите `Add Parameter`.
   - **Name:** `keys`
@@ -329,7 +337,7 @@ API использует стандартные HTTP-статус-коды дл�
 #### 4. Удаление секретов
 
 - **Method:** `DELETE`
-- **URL:** `http://vault_n8n:8000/api/v1/secrets`
+- **URL:** `http://vault_n8n:8200/api/v1/secrets`
 - **Options -> Query Parameters:**
   - Нажмите `Add Parameter`.
   - **Name:** `keys`
