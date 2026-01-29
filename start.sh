@@ -11,8 +11,6 @@
 # 5. Запускает сервис с помощью docker-compose из директории 'vault_n8n'.
 # ==============================================================================
 
-set -e # Прерывать выполнение при любой ошибке
-
 # --- Глобальные переменные ---
 REPO_URL="https://raw.githubusercontent.com/avdivo/vault_n8n/main"
 DOCKER_IMAGE="avdivo/vault-n8n:latest"
@@ -71,15 +69,16 @@ ensure_env_vars() {
             exit 1
         fi
     fi
-    # grep "|| true" - чтобы скрипт не падал, если файл пустой
-    AUTH_TOKEN_VALUE=$(grep -E "^AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2 || true)
+    # Проверяем наличие AUTH_TOKEN
+    AUTH_TOKEN_VALUE=$(grep -E "^AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2)
     if [ -z "$AUTH_TOKEN_VALUE" ]; then
         echo "INFO: AUTH_TOKEN не найден в $ENV_FILE. Генерируется новый..."
         AUTH_TOKEN=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(16))')
         echo "AUTH_TOKEN=$AUTH_TOKEN" >> "$ENV_FILE"
         display_token_box "AUTH_TOKEN" "$AUTH_TOKEN" "Сохраните этот токен! Он нужен для доступа к API."
     fi
-    ENCRYPTION_KEY_VALUE=$(grep -E "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2 || true)
+    # Проверяем наличие ENCRYPTION_KEY
+    ENCRYPTION_KEY_VALUE=$(grep -E "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2)
     if [ -z "$ENCRYPTION_KEY_VALUE" ]; then
         echo "INFO: ENCRYPTION_KEY не найден в $ENV_FILE. Генерируется новый..."
         ENCRYPTION_KEY=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(32))')
