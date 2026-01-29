@@ -1,19 +1,26 @@
 #!/bin/bash
 # ==============================================================================
-# Скрипт для быстрого запуска проекта VaultN8N из Docker Hub
+# Скрипт для установки и запуска проекта VaultN8N из Docker Hub.
 #
 # Этот скрипт:
-# 1. Скачивает необходимый docker-compose.yml из репозитория проекта.
-# 2. Проверяет и при необходимости создает/дополняет .env файл.
-# 3. Модифицирует docker-compose.yml для использования готового образа с Docker Hub.
-# 4. Запускает сервис с помощью docker-compose.
+# 1. Создает директорию 'vault_n8n' для инкапсуляции файлов проекта.
+# 2. Проверяет и создает .env файл в ТЕКУЩЕЙ директории (родительской).
+# 3. Скачивает docker-compose.yml в директорию 'vault_n8n'.
+# 4. Модифицирует docker-compose.yml для использования .env из родительской
+#    директории и готового образа с Docker Hub.
+# 5. Запускает сервис с помощью docker-compose из директории 'vault_n8n'.
 # ==============================================================================
+
+set -e # Прерывать выполнение при любой ошибке
 
 # --- Глобальные переменные ---
 REPO_URL="https://raw.githubusercontent.com/avdivo/vault_n8n/main"
 DOCKER_IMAGE="avdivo/vault-n8n:latest"
-COMPOSE_FILE="docker-compose.yml"
-ENV_FILE=".env"
+PROJECT_DIR="vault_n8n"
+COMPOSE_FILE_NAME="docker-compose.yml"
+COMPOSE_FILE_PATH="$PROJECT_DIR/$COMPOSE_FILE_NAME"
+DB_FILE_PATH="$PROJECT_DIR/secrets.db"
+ENV_FILE=".env" # В родительской директории
 
 # --- Функция для форматированного вывода токенов в рамке ---
 display_token_box() {
@@ -51,97 +58,90 @@ display_token_box() {
 
 # --- Функция для проверки и генерации переменных окружения ---
 ensure_env_vars() {
+    # Эта функция работает с .env в ТЕКУЩЕЙ директории
     if [ ! -f "$ENV_FILE" ]; then
         touch "$ENV_FILE"
-        echo "INFO: Создан новый файл .env."
+        echo "INFO: Создан новый файл .env в текущей директории."
     fi
-
-    # --- Поиск корректной команды python ---
     PYTHON_CMD="python3"
     if ! command -v $PYTHON_CMD &> /dev/null; then
         PYTHON_CMD="python"
         if ! command -v $PYTHON_CMD &> /dev/null; then
-            echo "ERROR: Python не установлен. Пожалуйста, установите Python 3."
+            echo "ОШИБКА: Python не установлен. Пожалуйста, установите Python 3." >&2
             exit 1
         fi
     fi
-
-    # Проверяем наличие AUTH_TOKEN
-    AUTH_TOKEN_VALUE=$(grep -E "^AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2)
+    # grep "|| true" - чтобы скрипт не падал, если файл пустой
+    AUTH_TOKEN_VALUE=$(grep -E "^AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2 || true)
     if [ -z "$AUTH_TOKEN_VALUE" ]; then
-        echo "INFO: AUTH_TOKEN не найден. Генерируется новый..."
+        echo "INFO: AUTH_TOKEN не найден в $ENV_FILE. Генерируется новый..."
         AUTH_TOKEN=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(16))')
         echo "AUTH_TOKEN=$AUTH_TOKEN" >> "$ENV_FILE"
         display_token_box "AUTH_TOKEN" "$AUTH_TOKEN" "Сохраните этот токен! Он нужен для доступа к API."
     fi
-
-    # Проверяем наличие ENCRYPTION_KEY
-    ENCRYPTION_KEY_VALUE=$(grep -E "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2)
+    ENCRYPTION_KEY_VALUE=$(grep -E "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2 || true)
     if [ -z "$ENCRYPTION_KEY_VALUE" ]; then
-        echo "INFO: ENCRYPTION_KEY не найден. Генерируется новый..."
+        echo "INFO: ENCRYPTION_KEY не найден в $ENV_FILE. Генерируется новый..."
         ENCRYPTION_KEY=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(32))')
         echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> "$ENV_FILE"
-        display_token_box "ENCRYPTION_KEY" "$ENCRYPTION_KEY" "Сохраните этот ключ! Он нужен для шифрования данных. Без него вы потеряете все данные."
+        display_token_box "ENCRYPTION_KEY" "$ENCRYPTION_KEY" "Сохраните этот ключ! Он нужен для шифрования данных."
     fi
 }
 
 # --- Основная логика скрипта ---
+main() {
+    echo "--- Установка и запуск VaultN8N ---"
 
-echo "--- Установка и запуск VaultN8N ---"
+    # 1. Проверка наличия утилит
+    if ! command -v curl &> /dev/null || ! command -v docker-compose &> /dev/null; then
+        echo "ОШИБКА: Для работы скрипта необходимы утилиты 'curl' и 'docker-compose'." >&2
+        exit 1
+    fi
 
-# 1. Проверка наличия необходимых утилит (curl, docker-compose)
-if ! command -v curl &> /dev/null || ! command -v docker-compose &> /dev/null; then
-    echo "ERROR: Для работы скрипта необходимы curl и docker-compose." >&2
-    exit 1
-fi
+    # 2. Создание директории проекта
+    mkdir -p "$PROJECT_DIR"
+    echo "INFO: Файлы проекта будут размещены в директории '$PROJECT_DIR'."
 
-# 2. Скачивание docker-compose.yml
-echo "INFO: Скачивание файла docker-compose.yml..."
-curl -sSL -o "$COMPOSE_FILE" "$REPO_URL/$COMPOSE_FILE"
-if [ $? -ne 0 ]; then
-    echo "ERROR: Не удалось скачать docker-compose.yml. Проверьте подключение к интернету." >&2
-    exit 1
-fi
+    # 3. Подготовка .env файла в родительской директории
+    ensure_env_vars
+    echo "INFO: Файл '$ENV_FILE' в текущей директории готов."
+    
+    # 4. Скачивание docker-compose.yml
+    if [ ! -f "$COMPOSE_FILE_PATH" ]; then
+        echo "INFO: Скачивание файла docker-compose.yml..."
+        curl -sSL -o "$COMPOSE_FILE_PATH" "$REPO_URL/$COMPOSE_FILE_NAME"
+    else
+        echo "INFO: Файл '$COMPOSE_FILE_PATH' уже существует, скачивание пропущено."
+    fi
+    
+    # 5. Проверка и подготовка файла базы данных
+    if [ -d "$DB_FILE_PATH" ]; then
+        echo "ОШИБКА: '$DB_FILE_PATH' существует, но является директорией." >&2
+        echo "Пожалуйста, удалите эту директорию командой: rm -r $DB_FILE_PATH" >&2
+        exit 1
+    fi
+    touch "$DB_FILE_PATH"
 
-# 3. Подготовка .env файла
-ensure_env_vars
-echo "INFO: Файл .env готов."
-echo "INFO: Важно! Сохраните сгенерированные токены/ключи из .env файла в безопасном месте."
-echo "INFO: Без ENCRYPTION_KEY вы не сможете расшифровать свои секреты!"
+    # 6. Модификация docker-compose.yml
+    # Используем sed для замены блока build на image и корректировки пути к .env.
+    # Флаг -i.bak создает резервную копию для совместимости с macOS.
+    sed -i.bak \
+        -e "s|build: .|image: $DOCKER_IMAGE|" \
+        -e "s|- ./.env|- ../.env|" \
+        "$COMPOSE_FILE_PATH"
+    rm -f "${COMPOSE_FILE_PATH}.bak" # Удаляем .bak-файл
+    echo "INFO: Файл docker-compose.yml настроен для запуска."
 
-# 4. Проверка и подготовка файла базы данных
-DB_FILE="secrets.db"
-# Проверяем, не является ли 'secrets.db' директорией
-if [ -d "$DB_FILE" ]; then
-    echo "ОШИБКА: '$DB_FILE' существует, но является директорией." >&2
-    echo "Это могло произойти из-за некорректного предыдущего запуска Docker." >&2
-    echo "Пожалуйста, удалите эту директорию командой: rm -r $DB_FILE" >&2
-    echo "Затем повторно запустите этот скрипт." >&2
-    exit 1
-fi
-# Убедимся, что файл базы данных существует на хосте.
-# Если его нет, создаем. Если он есть, touch просто обновит время модификации.
-touch "$DB_FILE"
+    # 7. Запуск контейнера из директории проекта
+    echo "INFO: Запуск Docker-контейнера... (это может занять некоторое время)"
+    (cd "$PROJECT_DIR" && docker-compose up -d)
 
-# 5. Модификация docker-compose.yml для использования образа с Docker Hub
-# Используем sed для замены блока build на image.
-# `sed -i` для in-place редактирования. Добавляем .bak для совместимости с macOS
-sed -i.bak "s|build: .|image: $DOCKER_IMAGE|" "$COMPOSE_FILE"
-# Удаляем .bak-файл
-rm -f "${COMPOSE_FILE}.bak"
-
-echo "INFO: docker-compose.yml настроен для использования образа '$DOCKER_IMAGE'."
-
-# 6. Запуск контейнера
-echo "INFO: Скачивание последней версии образа и запуск контейнера..."
-docker-compose up -d
-
-# 7. Проверка статуса
-if [ $? -eq 0 ]; then
     echo "--- VaultN8N успешно запущен! ---"
     echo "Приложение доступно по адресу http://localhost:8200"
     echo "Документация API (Swagger UI): http://localhost:8200/docs"
-    echo "Ваши ключи для доступа сохранены в файле .env в текущей директории."
-else
-    echo "ERROR: Произошла ошибка при запуске docker-compose. Проверьте логи выше." >&2
-fi
+    echo "Директория проекта: $PROJECT_DIR"
+    echo "Файл конфигурации: $ENV_FILE"
+}
+
+# Вызов основной функции с передачей всех аргументов
+main "$@"
