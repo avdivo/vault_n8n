@@ -131,7 +131,7 @@ fi
 if ! grep -q "^VAULTN8N_ENCRYPTION_KEY=" "${ENV_FILE}"; then
     KEY=$(openssl rand -hex 32)
     echo "VAULTN8N_ENCRYPTION_KEY=\"$KEY\"" >> "${ENV_FILE}"
-    log_success "Сгенерирован и добавлен VAULTN8N_ENCRYPTION_KEY."
+    display_token_box "VAULTN8N_ENCRYPTION_KEY" "$KEY" "Сохраните этот ключ! Он нужен для шифрования данных VaultN8N."
 else
     log_info "Переменная VAULTN8N_ENCRYPTION_KEY уже существует."
 fi
@@ -195,8 +195,8 @@ fi
 
 
 # Добавление переменной VAULTN8N_HOSTNAME в секцию environment сервиса caddy
-if ! grep -q "VAULTN8N_HOSTNAME: \\\\\\[email protected]" "${DOCKER_COMPOSE_FILE}"; then
-    sed -i "/services:/,/caddy:/,/environment:/s/^\( *\)environment:/\1environment:\n\1  - VAULTN8N_HOSTNAME=\\\\\$\\\${VAULTN8N_HOSTNAME}/" "${DOCKER_COMPOSE_FILE}"
+if ! grep -q "VAULTN8N_HOSTNAME: \\\${VAULTN8N_HOSTNAME}" "${DOCKER_COMPOSE_FILE}"; then
+    sed -i '/caddy:/,/environment:/s/^\s*environment:/&\n      - VAULTN8N_HOSTNAME=${VAULTN8N_HOSTNAME}/' "${DOCKER_COMPOSE_FILE}"
     log_success "Переменная VAULTN8N_HOSTNAME добавлена в окружение сервиса caddy."
 else
     log_info "Переменная VAULTN8N_HOSTNAME уже есть в окружении сервиса caddy."
