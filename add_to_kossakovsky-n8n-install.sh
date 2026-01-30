@@ -109,7 +109,7 @@ if [ -n "$DOMAIN" ]; then
     DEFAULT_HOSTNAME="${SERVICE_NAME}.${DOMAIN}"
 fi
 
-CURRENT_HOSTNAME=$(grep "^VAULTN8N_HOSTNAME=" "${ENV_FILE}" | cut -d'=' -f2)
+CURRENT_HOSTNAME=$(grep "^VAULTN8N_HOSTNAME=" "${ENV_FILE}" | cut -d'=' -f2 || true)
 
 if [ -z "$CURRENT_HOSTNAME" ]; then
     PROMPT_MSG="Введите домен для VaultN8N"
@@ -192,13 +192,14 @@ if ! grep -q "container_name: ${SERVICE_NAME}" "${DOCKER_COMPOSE_FILE}"; then
     volumes:
       - vault-n8n_data:/data
     environment:
-      - AUTH_TOKEN=\${VAULTN8N_AUTH_TOKEN}
-      - ENCRYPTION_KEY=\${VAULTN8N_ENCRYPTION_KEY}
-      - DATABASE_PATH=/data/secrets.db"
+      AUTH_TOKEN: \${VAULTN8N_AUTH_TOKEN}
+      ENCRYPTION_KEY: \${VAULTN8N_ENCRYPTION_KEY}
+      DATABASE_PATH: /data/secrets.db"
 
     # Создаем временный файл с блоком сервиса
     TMP_SERVICE_BLOCK_FILE=$(mktemp)
-    echo "${SERVICE_BLOCK}" > "${TMP_SERVICE_BLOCK_FILE}"
+    # Use printf to avoid issues with echo and backslashes
+    printf '%s' "${SERVICE_BLOCK}" > "${TMP_SERVICE_BLOCK_FILE}"
 
     # Вставляем содержимое файла после строки 'services:'
     sed -i -e "/^services:/r ${TMP_SERVICE_BLOCK_FILE}" "${DOCKER_COMPOSE_FILE}"
@@ -223,8 +224,9 @@ fi
 
 
 # Добавление переменной VAULTN8N_HOSTNAME в секцию environment сервиса caddy
-if ! grep -q "VAULTN8N_HOSTNAME=" "${DOCKER_COMPOSE_FILE}"; then
-    sed -i '/caddy:/,/environment:/s/^\s*environment:/&\n      - VAULTN8N_HOSTNAME=${VAULTN8N_HOSTNAME}/' "${DOCKER_COMPOSE_FILE}"
+if ! grep -q "VAULTN8N_HOSTNAME:" "${DOCKER_COMPOSE_FILE}"; then
+    # Use a more robust sed command to add the environment variable to caddy
+    sed -i '/^\s*caddy:/,/^\s*environment:/s/^\(\s*environment:\)/\1\n      VAULTN8N_HOSTNAME: ${VAULTN8N_HOSTNAME}/' "${DOCKER_COMPOSE_FILE}"
     log_success "Переменная VAULTN8N_HOSTNAME добавлена в окружение сервиса caddy."
 else
     log_info "Переменная VAULTN8N_HOSTNAME уже есть в окружении сервиса caddy."
@@ -234,7 +236,7 @@ fi
 # 3. Обновление Caddyfile
 log_info "Проверка и обновление файла ${CADDY_FILE}..."
 
-if ! grep -q "{\\\$VAULTN8N_HOSTNAME}" "${CADDY_FILE}"; then
+if ! grep -q "{\$VAULTN8N_HOSTNAME}" "${CADDY_FILE}"; then
     echo "" >> "${CADDY_FILE}"
     echo "# VaultN8N Service" >> "${CADDY_FILE}"
     echo "{\$VAULTN8N_HOSTNAME} {" >> "${CADDY_FILE}"
