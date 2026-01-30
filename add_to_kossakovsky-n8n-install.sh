@@ -103,30 +103,42 @@ log_info "Целевая директория: ${PROJECT_ROOT}"
 log_info "Проверка и обновление файла ${ENV_FILE}..."
 
 # Запрос домена для VaultN8N
-DOMAIN=$(grep -E '^USER_DOMAIN_NAME=' "${ENV_FILE}" | cut -d'=' -f2- | tr -d '[:space:]' || true)
+DOMAIN=$(grep -E '^USER_DOMAIN_NAME=' "${ENV_FILE}" | cut -d'=' -f2- | tr -d '[:space:]"' || true)
 DEFAULT_HOSTNAME=""
 if [ -n "$DOMAIN" ]; then
     DEFAULT_HOSTNAME="${SERVICE_NAME}.${DOMAIN}"
 fi
 
 CURRENT_HOSTNAME=$(grep "^VAULTN8N_HOSTNAME=" "${ENV_FILE}" | cut -d'=' -f2 || true)
+DOMAIN_MESSAGE="" # Message to be displayed with tokens
 
 if [ -z "$CURRENT_HOSTNAME" ]; then
-    PROMPT_MSG="Введите домен для VaultN8N"
-    if [ -n "$DEFAULT_HOSTNAME" ]; then
-        PROMPT_MSG="$PROMPT_MSG (по умолчанию: ${DEFAULT_HOSTNAME})"
-    fi
-
-    # Loop until a valid hostname is entered
-    while true; do
-        read -p "$PROMPT_MSG: " USER_HOSTNAME
-        VAULTN8N_HOSTNAME="${USER_HOSTNAME:-$DEFAULT_HOSTNAME}"
-        if [ -n "$VAULTN8N_HOSTNAME" ]; then
-            break
-        else
-            log_warn "Домен не может быть пустым. Пожалуйста, введите домен."
+    if [ -t 0 ]; then # Running in an interactive terminal
+        PROMPT_MSG="Введите домен для VaultN8N"
+        if [ -n "$DEFAULT_HOSTNAME" ]; then
+            PROMPT_MSG="$PROMPT_MSG (по умолчанию: ${DEFAULT_HOSTNAME})"
         fi
-    done
+
+        while true; do
+            read -p "$PROMPT_MSG: " USER_HOSTNAME
+            VAULTN8N_HOSTNAME="${USER_HOSTNAME:-$DEFAULT_HOSTNAME}"
+            if [ -n "$VAULTN8N_HOSTNAME" ]; then
+                break
+            else
+                log_warn "Домен не может быть пустым. Пожалуйста, введите домен."
+            fi
+        done
+        log_info "Переменная VAULTN8N_HOSTNAME установлена в: ${VAULTN8N_HOSTNAME}."
+    else # Running in non-interactive mode (e.g., curl | bash)
+        if [ -n "$DEFAULT_HOSTNAME" ]; then
+            VAULTN8N_HOSTNAME="$DEFAULT_HOSTNAME"
+            log_info "Домен для VaultN8N автоматически установлен в: ${VAULTN8N_HOSTNAME} (неинтерактивный режим)."
+            DOMAIN_MESSAGE="Для доступа к VaultN8N используйте домен: ${VAULTN8N_HOSTNAME}"
+        else
+            log_warn "Невозможно определить домен для VaultN8N в неинтерактивном режиме. Установите USER_DOMAIN_NAME в .env или запустите скрипт интерактивно."
+            exit 1
+        fi
+    fi
 
     echo "" >> "${ENV_FILE}"
     echo "# --- VaultN8N Settings ---" >> "${ENV_FILE}"
