@@ -193,9 +193,8 @@ else
     log_info "Том 'vault-n8n_data' уже существует в docker-compose.yml."
 fi
 
-
 # Добавление переменной VAULTN8N_HOSTNAME в секцию environment сервиса caddy
-if ! grep -q "VAULTN8N_HOSTNAME: \\\${VAULTN8N_HOSTNAME}" "${DOCKER_COMPOSE_FILE}"; then
+if ! grep -q "VAULTN8N_HOSTNAME=" "${DOCKER_COMPOSE_FILE}"; then
     sed -i '/caddy:/,/environment:/s/^\s*environment:/&\n      - VAULTN8N_HOSTNAME=${VAULTN8N_HOSTNAME}/' "${DOCKER_COMPOSE_FILE}"
     log_success "Переменная VAULTN8N_HOSTNAME добавлена в окружение сервиса caddy."
 else
