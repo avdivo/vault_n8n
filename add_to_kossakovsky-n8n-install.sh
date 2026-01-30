@@ -11,11 +11,11 @@
 # - Файл .env:
 #   - Добавляется переменная VAULTN8N_HOSTNAME для домена сервиса.
 #   - Генерируются и добавляются VAULTN8N_AUTH_TOKEN и VAULTN8N_ENCRYPTION_KEY.
-#   - Профиль "vaultn8n" добавляется в COMPOSE_PROFILES для активации сервиса.
-#   - Сервис "vaultn8n" добавляется в GOST_NO_PROXY для корректной работы сети.
+#   - Профиль "vault-n8n" добавляется в COMPOSE_PROFILES для активации сервиса.
+#   - Сервис "vault-n8n" добавляется в GOST_NO_PROXY для корректной работы сети.
 #
 # - Файл docker-compose.yml:
-#   - Добавляется полная конфигурация сервиса "vaultn8n" с использованием
+#   - Добавляется полная конфигурация сервиса "vault-n8n" с использованием
 #     образа avdivo/vault-n8n:latest.
 #   - В сервис "caddy" добавляется переменная окружения VAULTN8N_HOSTNAME.
 #   - В корневой раздел "volumes" добавляется том "vaultn8n_data" для хранения БД.
@@ -71,9 +71,9 @@ display_token_box() {
     local label_len=${#label}
     local token_len=${#token}
     local msg_len=${#msg}
-    local content_len=$((label_len + token_len + 3)) 
-    
-    local line_len=$((max_width - 2)) 
+    local content_len=$((label_len + token_len + 3))
+
+    local line_len=$((max_width - 2))
     if [ "$content_len" -gt "$line_len" ]; then
         line_len=$content_len
     fi
@@ -103,12 +103,31 @@ log_info "Целевая директория: ${PROJECT_ROOT}"
 log_info "Проверка и обновление файла ${ENV_FILE}..."
 
 # Запрос домена для VaultN8N
-DEFAULT_HOSTNAME="${SERVICE_NAME}.$(grep -oP '(?<=^DOMAIN=).*' $ENV_FILE | head -n 1)"
+DOMAIN=$(grep -E '^USER_DOMAIN_NAME=' "${ENV_FILE}" | cut -d'=' -f2- | tr -d '[:space:]' || true)
+DEFAULT_HOSTNAME=""
+if [ -n "$DOMAIN" ]; then
+    DEFAULT_HOSTNAME="${SERVICE_NAME}.${DOMAIN}"
+fi
+
 CURRENT_HOSTNAME=$(grep "^VAULTN8N_HOSTNAME=" "${ENV_FILE}" | cut -d'=' -f2)
 
 if [ -z "$CURRENT_HOSTNAME" ]; then
-    read -p "Введите домен для VaultN8N (по умолчанию: ${DEFAULT_HOSTNAME}): " USER_HOSTNAME
-    VAULTN8N_HOSTNAME="${USER_HOSTNAME:-$DEFAULT_HOSTNAME}"
+    PROMPT_MSG="Введите домен для VaultN8N"
+    if [ -n "$DEFAULT_HOSTNAME" ]; then
+        PROMPT_MSG="$PROMPT_MSG (по умолчанию: ${DEFAULT_HOSTNAME})"
+    fi
+
+    # Loop until a valid hostname is entered
+    while true; do
+        read -p "$PROMPT_MSG: " USER_HOSTNAME
+        VAULTN8N_HOSTNAME="${USER_HOSTNAME:-$DEFAULT_HOSTNAME}"
+        if [ -n "$VAULTN8N_HOSTNAME" ]; then
+            break
+        else
+            log_warn "Домен не может быть пустым. Пожалуйста, введите домен."
+        fi
+    done
+
     echo "" >> "${ENV_FILE}"
     echo "# --- VaultN8N Settings ---" >> "${ENV_FILE}"
     echo "VAULTN8N_HOSTNAME=${VAULTN8N_HOSTNAME}" >> "${ENV_FILE}"
@@ -117,6 +136,7 @@ else
     log_info "Переменная VAULTN8N_HOSTNAME уже существует: ${CURRENT_HOSTNAME}. Используется текущее значение."
     VAULTN8N_HOSTNAME="$CURRENT_HOSTNAME"
 fi
+
 
 # Генерация и добавление VAULTN8N_AUTH_TOKEN
 if ! grep -q "^VAULTN8N_AUTH_TOKEN=" "${ENV_FILE}"; then
@@ -139,8 +159,7 @@ fi
 # Добавление профиля в COMPOSE_PROFILES
 if ! grep -q "COMPOSE_PROFILES=.*${PROFILE_NAME}" "${ENV_FILE}"; then
     if grep -q "^COMPOSE_PROFILES=" "${ENV_FILE}"; then
-        sed -i "s/^\(COMPOSE_PROFILES=.*\)\$/\1,${PROFILE_NAME}/
-" "${ENV_FILE}"
+        sed -i "s/^\(COMPOSE_PROFILES=.*\)\$/\1,${PROFILE_NAME}/" "${ENV_FILE}"
     else
         echo "COMPOSE_PROFILES=${PROFILE_NAME}" >> "${ENV_FILE}"
     fi
@@ -152,8 +171,7 @@ fi
 # Добавление сервиса в GOST_NO_PROXY (если используется)
 if grep -q "^GOST_NO_PROXY=" "${ENV_FILE}"; then
     if ! grep -q "GOST_NO_PROXY=.*${SERVICE_NAME}" "${ENV_FILE}"; then
-        sed -i "s/^\(GOST_NO_PROXY=.*\)\$/\1,${SERVICE_NAME}/
-" "${ENV_FILE}"
+        sed -i "s/^\(GOST_NO_PROXY=.*\)\$/\1,${SERVICE_NAME}/" "${ENV_FILE}"
         log_success "Сервис '${SERVICE_NAME}' добавлен в GOST_NO_PROXY."
     else
         log_info "Сервис '${SERVICE_NAME}' уже есть в GOST_NO_PROXY."
@@ -165,7 +183,6 @@ log_info "Проверка и обновление файла ${DOCKER_COMPOSE_F
 
 # Добавление сервиса vaultn8n, если его нет
 if ! grep -q "container_name: ${SERVICE_NAME}" "${DOCKER_COMPOSE_FILE}"; then
-    # Вставляем перед первым top-level 'volumes:'
     SERVICE_BLOCK="
   ${SERVICE_NAME}:
     image: ${DOCKER_IMAGE}
@@ -175,23 +192,35 @@ if ! grep -q "container_name: ${SERVICE_NAME}" "${DOCKER_COMPOSE_FILE}"; then
     volumes:
       - vault-n8n_data:/data
     environment:
-      - AUTH_TOKEN=\\\\\${VAULTN8N_AUTH_TOKEN}
-      - ENCRYPTION_KEY=\\\\\${VAULTN8N_ENCRYPTION_KEY}
-      - DATABASE_PATH=/data/secrets.db
-"
-    sed -i "/^volumes:/i\$SERVICE_BLOCK" "${DOCKER_COMPOSE_FILE}"
+      - AUTH_TOKEN=\${VAULTN8N_AUTH_TOKEN}
+      - ENCRYPTION_KEY=\${VAULTN8N_ENCRYPTION_KEY}
+      - DATABASE_PATH=/data/secrets.db"
+
+    # Создаем временный файл с блоком сервиса
+    TMP_SERVICE_BLOCK_FILE=$(mktemp)
+    echo "${SERVICE_BLOCK}" > "${TMP_SERVICE_BLOCK_FILE}"
+
+    # Вставляем содержимое файла после строки 'services:'
+    sed -i -e "/^services:/r ${TMP_SERVICE_BLOCK_FILE}" "${DOCKER_COMPOSE_FILE}"
+
+    # Удаляем временный файл
+    rm "${TMP_SERVICE_BLOCK_FILE}"
+
     log_success "Сервис '${SERVICE_NAME}' добавлен в docker-compose.yml."
 else
     log_info "Сервис '${SERVICE_NAME}' уже существует в docker-compose.yml."
 fi
 
+
 # Добавление тома vault-n8n_data, если его нет
-if ! grep -q "vault-n8n_data:" "${DOCKER_COMPOSE_FILE}"; then
-    echo "  vault-n8n_data:" >> "${DOCKER_COMPOSE_FILE}"
+if ! grep -q "^\s*vault-n8n_data:" "${DOCKER_COMPOSE_FILE}"; then
+    # Вставляем после строки 'volumes:'
+    sed -i '/^volumes:/a \ \ vault-n8n_data:' "${DOCKER_COMPOSE_FILE}"
     log_success "Том 'vault-n8n_data' добавлен в docker-compose.yml."
 else
     log_info "Том 'vault-n8n_data' уже существует в docker-compose.yml."
 fi
+
 
 # Добавление переменной VAULTN8N_HOSTNAME в секцию environment сервиса caddy
 if ! grep -q "VAULTN8N_HOSTNAME=" "${DOCKER_COMPOSE_FILE}"; then
@@ -205,10 +234,10 @@ fi
 # 3. Обновление Caddyfile
 log_info "Проверка и обновление файла ${CADDY_FILE}..."
 
-if ! grep -q "{\\\\\$\\\${VAULTN8N_HOSTNAME}}" "${CADDY_FILE}"; then
+if ! grep -q "{\\\$VAULTN8N_HOSTNAME}" "${CADDY_FILE}"; then
     echo "" >> "${CADDY_FILE}"
     echo "# VaultN8N Service" >> "${CADDY_FILE}"
-    echo "{\\\\\$\\\${VAULTN8N_HOSTNAME}} {" >> "${CADDY_FILE}"
+    echo "{\$VAULTN8N_HOSTNAME} {" >> "${CADDY_FILE}"
     echo "    reverse_proxy ${SERVICE_NAME}:8000" >> "${CADDY_FILE}"
     echo "}" >> "${CADDY_FILE}"
     log_success "Блок для '${SERVICE_NAME}' добавлен в Caddyfile."
