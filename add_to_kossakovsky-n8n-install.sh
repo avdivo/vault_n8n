@@ -2,40 +2,11 @@
 # ======================================================================================
 # Скрипт для автоматической интеграции сервиса VaultN8N в проект kossakovsky/n8n-install.
 #
-# Назначение:
-# Этот скрипт модифицирует конфигурационные файлы существующего развертывания
-# n8n-install, чтобы добавить и настроить сервис VaultN8N как "родной"
-# компонент системы.
-#
-# Производимые изменения:
-# - Файл .env:
-#   - Добавляется переменная VAULTN8N_HOSTNAME для домена сервиса.
-#   - Генерируются и добавляются VAULTN8N_AUTH_TOKEN и VAULTN8N_ENCRYPTION_KEY.
-#   - Профиль "vault-n8n" добавляется в COMPOSE_PROFILES для активации сервиса.
-#   - Сервис "vault-n8n" добавляется в GOST_NO_PROXY для корректной работы сети.
-#
-# - Файл docker-compose.yml:
-#   - Добавляется полная конфигурация сервиса "vault-n8n" с использованием
-#     образа avdivo/vault-n8n:latest.
-#   - В сервис "caddy" добавляется переменная окружения VAULTN8N_HOSTNAME.
-#   - В корневой раздел "volumes" добавляется том "vaultn8n_data" для хранения БД.
-#
-# - Файл Caddyfile:
-#   - Добавляется блок, настраивающий реверс-прокси для домена
-#     {$VAULTN8N_HOSTNAME} на внутренний порт контейнера vaultn8n.
-#
-# Безопасность:
-# Скрипт можно безопасно запускать несколько раз. Существующие значения
-# и конфигурации не будут перезаписаны.
-#
-# Требования:
-# - Скрипт должен запускаться из корневой директории проекта n8n-install.
-#   Пример:
-#   cd /path/to/n8n-install
-#   bash /path/to/vault_n8n/add_to_kossakovsky-n8n-install.sh
+# Этот скрипт является идемпотентным и может быть запущен несколько раз.
 # ======================================================================================
 
 set -e # Прекратить выполнение при любой ошибке
+set -o pipefail # Прекратить выполнение, если команда в конвейере завершается с ошибкой
 
 # --- Переменные ---
 PROJECT_ROOT=$(pwd)
@@ -55,145 +26,101 @@ log_success() {
     echo "✅ $1"
 }
 
-log_warn() {
-    echo "⚠️ $1"
+fail() {
+    echo "ОШИБКА: $1" >&2
+    exit 1
 }
 
-# --- Функция для форматированного вывода токенов в рамке ---
-display_token_box() {
-    local label="$1"
+# Функция для форматированного вывода итоговой информации
+display_summary_box() {
+    local hostname="$1"
     local token="$2"
-    local msg="$3"
+    local key="$3"
+
+    # Подготовка строк
+    local line1="Домен сервиса: ${hostname}"
+    local line2="AUTH_TOKEN: ${token}"
+    local line3="ENCRYPTION_KEY: ${key}"
+    local line4="Обязательно сохраните токен и ключ в надежном месте!"
+
+    # Определение максимальной длины для рамки
+    local max_len=0
+    for line in "$line1" "$line2" "$line3" "$line4"; do
+        if ((${#line} > max_len)); then
+            max_len=${#line}
+        fi
+    done
+
     local border_char="="
     local padding_char=" "
-
-    local max_width=80
-    local label_len=${#label}
-    local token_len=${#token}
-    local msg_len=${#msg}
-    local content_len=$((label_len + token_len + 3))
-
-    local line_len=$((max_width - 2))
-    if [ "$content_len" -gt "$line_len" ]; then
-        line_len=$content_len
-    fi
+    local line_len=$((max_len + 4)) # Добавляем отступы
 
     local border=$(printf "%*s" "$line_len" | tr " " "$border_char")
-    local padding=$(printf "%*s" "$line_len" | tr " " "$padding_char")
+    local padding_line="$border_char$(printf "%*s" $((line_len - 2)) | tr " " "$padding_char")$border_char"
 
+    # Вывод рамки
     echo ""
-    echo "$border_char$border$border_char"
-    echo "$border_char$padding$border_char"
-    printf "%s %s %s\n" "$border_char" "$(printf "%-${line_len}s" "$label: $token")" "$border_char"
-    echo "$border_char$padding$border_char"
-    printf "%s %s %s\n" "$border_char" "$(printf "%-${line_len}s" "$msg")" "$border_char"
-    echo "$border_char$padding$border_char"
-    echo "$border_char$border$border_char"
+    echo "$border"
+    echo "$padding_line"
+    printf "%s %-*s %s\n" "$border_char" $((line_len - 4)) "$line1" "$border_char"
+    printf "%s %-*s %s\n" "$border_char" $((line_len - 4)) "$line2" "$border_char"
+    printf "%s %-*s %s\n" "$border_char" $((line_len - 4)) "$line3" "$border_char"
+    echo "$padding_line"
+    printf "%s %-*s %s\n" "$border_char" $((line_len - 4)) "$line4" "$border_char"
+    echo "$padding_line"
+    echo "$border"
     echo ""
 }
 
 
 # --- Начало ---
-log_info "Запуск скрипта для интеграции VaultN8N в n8n-install..."
-log_info "Целевая директория: ${PROJECT_ROOT}"
+log_info "Запуск скрипта для интеграции VaultN8N..."
 
+# --- 1. Конфигурация файла .env ---
+log_info "Проверка и обновление файла .env..."
+[ -f "$ENV_FILE" ] || fail "Файл .env не найден. Убедитесь, что вы находитесь в корневой директории проекта n8n-install."
 
-
-# 1. Конфигурация файла .env
-log_info "Проверка и обновление файла ${ENV_FILE}..."
-
-# Запрос домена для VaultN8N
+# Установка домена
 DOMAIN=$(grep -E '^USER_DOMAIN_NAME=' "${ENV_FILE}" | cut -d'=' -f2- | tr -d '[:space:]"' || true)
-DEFAULT_HOSTNAME=""
-if [ -n "$DOMAIN" ]; then
-    DEFAULT_HOSTNAME="${SERVICE_NAME}.${DOMAIN}"
-fi
-
-CURRENT_HOSTNAME=$(grep "^VAULTN8N_HOSTNAME=" "${ENV_FILE}" | cut -d'=' -f2 || true)
-DOMAIN_MESSAGE="" # Message to be displayed with tokens
-
-if [ -z "$CURRENT_HOSTNAME" ]; then
-    if [ -t 0 ]; then # Running in an interactive terminal
-        PROMPT_MSG="Введите домен для VaultN8N"
-        if [ -n "$DEFAULT_HOSTNAME" ]; then
-            PROMPT_MSG="$PROMPT_MSG (по умолчанию: ${DEFAULT_HOSTNAME})"
-        fi
-
-        while true; do
-            read -p "$PROMPT_MSG: " USER_HOSTNAME
-            VAULTN8N_HOSTNAME="${USER_HOSTNAME:-$DEFAULT_HOSTNAME}"
-            if [ -n "$VAULTN8N_HOSTNAME" ]; then
-                break
-            else
-                log_warn "Домен не может быть пустым. Пожалуйста, введите домен."
-            fi
-        done
-        log_info "Переменная VAULTN8N_HOSTNAME установлена в: ${VAULTN8N_HOSTNAME}."
-    else # Running in non-interactive mode (e.g., curl | bash)
-        if [ -n "$DEFAULT_HOSTNAME" ]; then
-            VAULTN8N_HOSTNAME="$DEFAULT_HOSTNAME"
-            log_info "Домен для VaultN8N автоматически установлен в: ${VAULTN8N_HOSTNAME} (неинтерактивный режим)."
-            DOMAIN_MESSAGE="Для доступа к VaultN8N используйте домен: ${VAULTN8N_HOSTNAME}"
-        else
-            log_warn "Невозможно определить домен для VaultN8N в неинтерактивном режиме. Установите USER_DOMAIN_NAME в .env или запустите скрипт интерактивно."
-            exit 1
-        fi
-    fi
-
+[ -n "$DOMAIN" ] || fail "Переменная USER_DOMAIN_NAME не найдена или пуста в файле .env. Пожалуйста, установите ее."
+VAULTN8N_HOSTNAME="${SERVICE_NAME}.${DOMAIN}"
+if ! grep -q "^VAULTN8N_HOSTNAME=" "${ENV_FILE}"; then
     echo "" >> "${ENV_FILE}"
     echo "# --- VaultN8N Settings ---" >> "${ENV_FILE}"
     echo "VAULTN8N_HOSTNAME=${VAULTN8N_HOSTNAME}" >> "${ENV_FILE}"
-    log_success "Добавлена переменная VAULTN8N_HOSTNAME: ${VAULTN8N_HOSTNAME}."
-else
-    log_info "Переменная VAULTN8N_HOSTNAME уже существует: ${CURRENT_HOSTNAME}. Используется текущее значение."
-    VAULTN8N_HOSTNAME="$CURRENT_HOSTNAME"
 fi
 
-
-# Генерация и добавление VAULTN8N_AUTH_TOKEN
-if ! grep -q "^VAULTN8N_AUTH_TOKEN=" "${ENV_FILE}"; then
-    TOKEN=$(openssl rand -hex 16)
-    echo "VAULTN8N_AUTH_TOKEN=\"$TOKEN\"" >> "${ENV_FILE}"
-    display_token_box "VAULTN8N_AUTH_TOKEN" "$TOKEN" "Сохраните этот токен! Он нужен для доступа к API VaultN8N."
-else
-    log_info "Переменная VAULTN8N_AUTH_TOKEN уже существует."
+# Генерация и/или получение токенов
+FINAL_TOKEN=$(grep -E '^VAULTN8N_AUTH_TOKEN=' "${ENV_FILE}" | cut -d'=' -f2- | tr -d '"' || true)
+if [ -z "$FINAL_TOKEN" ]; then
+    FINAL_TOKEN=$(openssl rand -hex 16)
+    echo "VAULTN8N_AUTH_TOKEN=\"$FINAL_TOKEN\"" >> "${ENV_FILE}"
 fi
 
-# Генерация и добавление VAULTN8N_ENCRYPTION_KEY
-if ! grep -q "^VAULTN8N_ENCRYPTION_KEY=" "${ENV_FILE}"; then
-    KEY=$(openssl rand -hex 32)
-    echo "VAULTN8N_ENCRYPTION_KEY=\"$KEY\"" >> "${ENV_FILE}"
-    display_token_box "VAULTN8N_ENCRYPTION_KEY" "$KEY" "Сохраните этот ключ! Он нужен для шифрования данных VaultN8N."
-else
-    log_info "Переменная VAULTN8N_ENCRYPTION_KEY уже существует."
+FINAL_KEY=$(grep -E '^VAULTN8N_ENCRYPTION_KEY=' "${ENV_FILE}" | cut -d'=' -f2- | tr -d '"' || true)
+if [ -z "$FINAL_KEY" ]; then
+    FINAL_KEY=$(openssl rand -hex 32)
+    echo "VAULTN8N_ENCRYPTION_KEY=\"$FINAL_KEY\"" >> "${ENV_FILE}"
 fi
 
-# Добавление профиля в COMPOSE_PROFILES
+# Добавление профиля
 if ! grep -q "COMPOSE_PROFILES=.*${PROFILE_NAME}" "${ENV_FILE}"; then
     if grep -q "^COMPOSE_PROFILES=" "${ENV_FILE}"; then
         sed -i "s/^\(COMPOSE_PROFILES=.*\)\$/\1,${PROFILE_NAME}/" "${ENV_FILE}"
     else
         echo "COMPOSE_PROFILES=${PROFILE_NAME}" >> "${ENV_FILE}"
     fi
-    log_success "Профиль '${PROFILE_NAME}' добавлен в COMPOSE_PROFILES."
-else
-    log_info "Профиль '${PROFILE_NAME}' уже есть в COMPOSE_PROFILES."
 fi
 
-# Добавление сервиса в GOST_NO_PROXY (если используется)
-if grep -q "^GOST_NO_PROXY=" "${ENV_FILE}"; then
-    if ! grep -q "GOST_NO_PROXY=.*${SERVICE_NAME}" "${ENV_FILE}"; then
-        sed -i "s/^\(GOST_NO_PROXY=.*\)\$/\1,${SERVICE_NAME}/" "${ENV_FILE}"
-        log_success "Сервис '${SERVICE_NAME}' добавлен в GOST_NO_PROXY."
-    else
-        log_info "Сервис '${SERVICE_NAME}' уже есть в GOST_NO_PROXY."
-    fi
+# Добавление в NO_PROXY
+if grep -q "^GOST_NO_PROXY=" "${ENV_FILE}" && ! grep -q "GOST_NO_PROXY=.*${SERVICE_NAME}" "${ENV_FILE}"; then
+    sed -i "s/^\(GOST_NO_PROXY=.*\)\$/\1,${SERVICE_NAME}/" "${ENV_FILE}"
 fi
+log_success "Файл .env сконфигурирован."
 
-# 2. Обновление docker-compose.yml
-log_info "Проверка и обновление файла ${DOCKER_COMPOSE_FILE}..."
-
-# Добавление сервиса vaultn8n, если его нет
+# --- 2. Обновление docker-compose.yml ---
+log_info "Проверка и обновление файла docker-compose.yml..."
+# Добавление сервиса
 if ! grep -q "container_name: ${SERVICE_NAME}" "${DOCKER_COMPOSE_FILE}"; then
     SERVICE_BLOCK="
   ${SERVICE_NAME}:
@@ -208,62 +135,34 @@ if ! grep -q "container_name: ${SERVICE_NAME}" "${DOCKER_COMPOSE_FILE}"; then
       ENCRYPTION_KEY: \${VAULTN8N_ENCRYPTION_KEY}
       DATABASE_PATH: /data/secrets.db"
 
-    # Создаем временный файл с блоком сервиса
     TMP_SERVICE_BLOCK_FILE=$(mktemp)
-    # Use printf to avoid issues with echo and backslashes
     printf '%s' "${SERVICE_BLOCK}" > "${TMP_SERVICE_BLOCK_FILE}"
-
-    # Вставляем содержимое файла после строки 'services:'
     sed -i -e "/^services:/r ${TMP_SERVICE_BLOCK_FILE}" "${DOCKER_COMPOSE_FILE}"
-
-    # Удаляем временный файл
     rm "${TMP_SERVICE_BLOCK_FILE}"
-
-    log_success "Сервис '${SERVICE_NAME}' добавлен в docker-compose.yml."
-else
-    log_info "Сервис '${SERVICE_NAME}' уже существует в docker-compose.yml."
 fi
 
-
-# Добавление тома vault-n8n_data, если его нет
+# Добавление тома
 if ! grep -q "^\s*vault-n8n_data:" "${DOCKER_COMPOSE_FILE}"; then
-    # Вставляем после строки 'volumes:'
     sed -i '/^volumes:/a \ \ vault-n8n_data:' "${DOCKER_COMPOSE_FILE}"
-    log_success "Том 'vault-n8n_data' добавлен в docker-compose.yml."
-else
-    log_info "Том 'vault-n8n_data' уже существует в docker-compose.yml."
 fi
 
-
-# Добавление переменной VAULTN8N_HOSTNAME в секцию environment сервиса caddy
+# Добавление переменной в caddy
 if ! grep -q "VAULTN8N_HOSTNAME:" "${DOCKER_COMPOSE_FILE}"; then
-    # Use a more robust sed command to add the environment variable to caddy
     sed -i '/^\s*caddy:/,/^\s*environment:/s/^\(\s*environment:\)/\1\n      VAULTN8N_HOSTNAME: ${VAULTN8N_HOSTNAME}/' "${DOCKER_COMPOSE_FILE}"
-    log_success "Переменная VAULTN8N_HOSTNAME добавлена в окружение сервиса caddy."
-else
-    log_info "Переменная VAULTN8N_HOSTNAME уже есть в окружении сервиса caddy."
 fi
+log_success "Файл docker-compose.yml сконфигурирован."
 
-
-# 3. Обновление Caddyfile
-log_info "Проверка и обновление файла ${CADDY_FILE}..."
-
+# --- 3. Обновление Caddyfile ---
+log_info "Проверка и обновление файла Caddyfile..."
 if ! grep -q "{\$VAULTN8N_HOSTNAME}" "${CADDY_FILE}"; then
     echo "" >> "${CADDY_FILE}"
     echo "# VaultN8N Service" >> "${CADDY_FILE}"
     echo "{\$VAULTN8N_HOSTNAME} {" >> "${CADDY_FILE}"
     echo "    reverse_proxy ${SERVICE_NAME}:8000" >> "${CADDY_FILE}"
     echo "}" >> "${CADDY_FILE}"
-    log_success "Блок для '${SERVICE_NAME}' добавлен в Caddyfile."
-else
-    log_info "Блок для '${SERVICE_NAME}' уже существует в Caddyfile."
 fi
+log_success "Файл Caddyfile сконфигурирован."
 
-echo ""
-log_info "-------------------------------------------------"
-log_info "Скрипт успешно завершен!"
-log_info "Что дальше:"
-log_info "1. Если вы не использовали домен по умолчанию, убедитесь, что он корректно настроен в DNS."
-log_info "2. Сохраните ваши VAULTN8N_AUTH_TOKEN и VAULTN8N_ENCRYPTION_KEY в надежном месте."
-log_info "3. Перезапустите проект командой: docker-compose up -d"
-log_info "-------------------------------------------------"
+# --- Финальный отчет ---
+log_info "Интеграция успешно завершена!"
+display_summary_box "$VAULTN8N_HOSTNAME" "$FINAL_TOKEN" "$FINAL_KEY"
