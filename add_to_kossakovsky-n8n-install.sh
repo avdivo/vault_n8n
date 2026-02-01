@@ -151,8 +151,8 @@ services:
       timeout: 10s
       retries: 5
     environment:
-      - AUTH_TOKEN=\${VAULT_N8N_AUTH_TOKEN}
-      - ENCRYPTION_KEY=\${VAULT_N8N_ENCRYPTION_KEY}
+      - VAULT_N8N_AUTH_TOKEN=\${VAULT_N8N_AUTH_TOKEN}
+      - VAULT_N8N_ENCRYPTION_KEY=\${VAULT_N8N_ENCRYPTION_KEY}
       - DATABASE_PATH=/data/secrets.db
     volumes:
       - ./data:/data
@@ -177,6 +177,7 @@ EOF
 {\$VAULT_N8N_HOSTNAME} {
     reverse_proxy $SERVICE_NAME:8000
 }
+
 
 END_CADDY
 )
