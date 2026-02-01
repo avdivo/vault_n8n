@@ -146,7 +146,7 @@ services:
         max-size: "1m"
         max-file: "1"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/docs || exit 1"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -177,8 +177,6 @@ EOF
 {\$VAULT_N8N_HOSTNAME} {
     reverse_proxy $SERVICE_NAME:8000
 }
-
-
 END_CADDY
 )
         # Use awk to insert the block before the line containing "# SearXNG"
@@ -186,6 +184,7 @@ END_CADDY
             awk -v block="$CADDY_INSERT" '
             /# SearXNG/ && !p {
                 print block;
+                print "";
                 p=1
             }
             {
@@ -194,7 +193,7 @@ END_CADDY
             log_success "Конфигурация для '$SERVICE_NAME' добавлена в '$CADDY_FILE'."
         else
             log_info "Не удалось найти блок '# SearXNG', добавляем конфигурацию в конец файла."
-            printf '%s\n' "$CADDY_INSERT" >> "$CADDY_FILE"
+            printf '%s\n\n' "$CADDY_INSERT" >> "$CADDY_FILE"
             log_success "Конфигурация для '$SERVICE_NAME' добавлена в конец '$CADDY_FILE'."
         fi
     fi
