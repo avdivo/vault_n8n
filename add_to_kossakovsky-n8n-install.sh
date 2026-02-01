@@ -25,15 +25,15 @@ WRAPPER_SCRIPT_NAME="vault.sh"
 
 # --- Функция для вывода сообщений ---
 log_info() {
-    echo "INFO: "
+    echo "INFO: $1"
 }
 
 log_success() {
-    echo "✅ SUCCESS: "
+    echo "✅ SUCCESS: $1"
 }
 
 log_error() {
-    echo "❌ ERROR: " >&2
+    echo "❌ ERROR: $1" >&2
     exit 1
 }
 
