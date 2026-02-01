@@ -101,7 +101,7 @@ main() {
     log_success "Директория '$SERVICE_DIR/data' готова."
 
     # 4. Обновление .env файла (с проверкой на существование)
-    if grep -q "VAULT_N8N_HOSTNAME=" "$ENV_FILE"; then
+    if grep -q "AUTH_TOKEN=" "$ENV_FILE"; then
         log_info "Переменные для '$SERVICE_NAME' уже существуют в $ENV_FILE. Пропускаем..."
     else
         log_info "Добавление переменных в '$ENV_FILE'..."
@@ -113,8 +113,8 @@ main() {
             echo ""
             echo "# --- Переменные для сервиса $SERVICE_NAME ---"
             echo "VAULT_N8N_HOSTNAME=$service_hostname"
-            echo "VAULT_AUTH_TOKEN=$auth_token"
-            echo "VAULT_ENCRYPTION_KEY=$encryption_key"
+            echo "AUTH_TOKEN=$auth_token"
+            echo "ENCRYPTION_KEY=$encryption_key"
             echo "# --- Конец секции $SERVICE_NAME ---"
         } >> "$ENV_FILE"
         log_success "Переменные успешно добавлены в '$ENV_FILE'."
@@ -139,8 +139,8 @@ services:
       timeout: 10s
       retries: 5
     environment:
-      - AUTH_TOKEN=\${VAULT_AUTH_TOKEN}
-      - ENCRYPTION_KEY=\${VAULT_ENCRYPTION_KEY}
+      - AUTH_TOKEN=\${AUTH_TOKEN}
+      - ENCRYPTION_KEY=\${ENCRYPTION_KEY}
       - DATABASE_PATH=/data/secrets.db
     volumes:
       - ./data:/data
@@ -202,8 +202,8 @@ EOW
     log_info "Загрузка актуальных данных из .env для отчета..."
     # Загружаем переменные из .env в subshell, чтобы получить актуальные значения
     # на случай, если они уже были в файле
-    local final_auth_token=$(grep "VAULT_AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2)
-    local final_encryption_key=$(grep "VAULT_ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2)
+    local final_auth_token=$(grep "AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2)
+    local final_encryption_key=$(grep "ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2)
     local final_hostname=$(grep "VAULT_N8N_HOSTNAME=" "$ENV_FILE" | cut -d '=' -f2)
 
     local protocol="https"
@@ -214,8 +214,8 @@ EOW
     display_generated_data_box \
         "$SERVICE_NAME" \
         "$protocol://$final_hostname" \
-        "VAULT_AUTH_TOKEN" "$final_auth_token" \
-        "VAULT_ENCRYPTION_KEY" "$final_encryption_key" \
+        "AUTH_TOKEN" "$final_auth_token" \
+        "ENCRYPTION_KEY" "$final_encryption_key" \
         "./$WRAPPER_SCRIPT_NAME up -d" \
         "./$WRAPPER_SCRIPT_NAME down"
 
