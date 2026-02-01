@@ -7,7 +7,8 @@
 # 2. Добавляет переменные окружения в .env файл.
 # 3. Создает отдельный docker-compose.vault-n8n.yml в новой папке ./vault-n8n.
 # 4. Модифицирует Caddyfile для предоставления доступа к сервису извне.
-# 5. Выводит сгенерированные данные и инструкции по запуску.
+# 5. Создает и делает исполняемым управляющий скрипт vault.sh.
+# 6. Выводит сгенерированные данные и УПРОЩЕННЫЕ инструкции по запуску.
 #
 # Скрипт идемпотентен: безопасен для повторного запуска.
 # ==============================================================================
@@ -20,6 +21,7 @@ SERVICE_DIR="./$SERVICE_NAME"
 COMPOSE_FILE_PATH="$SERVICE_DIR/docker-compose.$SERVICE_NAME.yml"
 CADDY_FILE="Caddyfile"
 ENV_FILE=".env"
+WRAPPER_SCRIPT_NAME="vault.sh"
 
 # --- Функция для вывода сообщений ---
 log_info() {
@@ -120,8 +122,7 @@ main() {
 
     # 5. Создание docker-compose файла (с healthcheck и logging)
     log_info "Создание файла '$COMPOSE_FILE_PATH'..."
-    # Одинарная кавычка в EOF отключает интерпретацию \ и $ внутри heredoc
-    cat << 'EOF' > "$COMPOSE_FILE_PATH"
+    cat << EOF > "$COMPOSE_FILE_PATH"
 version: '3.8'
 
 services:
@@ -140,8 +141,8 @@ services:
       timeout: 10s
       retries: 5
     environment:
-      - AUTH_TOKEN=${VAULT_AUTH_TOKEN}
-      - ENCRYPTION_KEY=${VAULT_ENCRYPTION_KEY}
+      - AUTH_TOKEN=\${VAULT_AUTH_TOKEN}
+      - ENCRYPTION_KEY=\${VAULT_ENCRYPTION_KEY}
       - DATABASE_PATH=/data/secrets.db
     volumes:
       - ./data:/data
@@ -186,7 +187,20 @@ END_CADDY
         fi
     fi
 
-    # 7. Вывод финального отчета
+    # 7. Создание управляющего скрипта-обертки
+    log_info "Создание управляющего скрипта ./$WRAPPER_SCRIPT_NAME для удобства..."
+    cat << 'EOW' > "./$WRAPPER_SCRIPT_NAME"
+#!/bin/bash
+# Управляющий скрипт для сервиса vault-n8n
+# Пробрасывает все аргументы в docker-compose с правильными флагами.
+docker compose --env-file ./.env -f ./vault-n8n/docker-compose.vault-n8n.yml "$@"
+EOW
+    
+    chmod +x "./$WRAPPER_SCRIPT_NAME"
+    log_success "Скрипт ./$WRAPPER_SCRIPT_NAME успешно создан и сделан исполняемым."
+
+
+    # 8. Вывод финального отчета
     log_info "Загрузка актуальных данных из .env для отчета..."
     # Загружаем переменные из .env в subshell, чтобы получить актуальные значения
     # на случай, если они уже были в файле
@@ -204,8 +218,8 @@ END_CADDY
         "$protocol://$final_hostname" \
         "VAULT_AUTH_TOKEN" "$final_auth_token" \
         "VAULT_ENCRYPTION_KEY" "$final_encryption_key" \
-        "docker compose -f $COMPOSE_FILE_PATH up -d" \
-        "docker compose -f $COMPOSE_FILE_PATH down"
+        "./$WRAPPER_SCRIPT_NAME up -d" \
+        "./$WRAPPER_SCRIPT_NAME down"
 
     log_info "Не забудьте перезапустить Caddy, чтобы применить изменения: docker compose up -d --force-recreate caddy"
 }
