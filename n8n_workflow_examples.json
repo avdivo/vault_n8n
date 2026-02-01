@@ -1,0 +1,11 @@
+{
+  "description": "Примеры рабочих процессов n8n для VaultN8N",
+  "workflows": [
+    {
+      "name": "Пример: Добавление одного секрета в VaultN8N",
+      "nodes": [
+        // Placeholder for n8n workflow JSON
+      ]
+    }
+  ]
+}
