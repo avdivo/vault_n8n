@@ -123,8 +123,6 @@ main() {
     # 5. Создание docker-compose файла (с healthcheck и logging)
     log_info "Создание файла '$COMPOSE_FILE_PATH'..."
     cat << EOF > "$COMPOSE_FILE_PATH"
-version: '3.8'
-
 services:
   $SERVICE_NAME:
     image: avdivo/vault-n8n:latest
