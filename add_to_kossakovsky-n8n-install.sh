@@ -125,9 +125,9 @@ main() {
 version: '3.8'
 
 services:
-  vault-n8n:
+  $SERVICE_NAME:
     image: avdivo/vault-n8n:latest
-    container_name: vault-n8n
+    container_name: $SERVICE_NAME
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -146,10 +146,10 @@ services:
     volumes:
       - ./data:/data
     networks:
-      - n8n-install_default
+      - localai_default
 
 networks:
-  n8n-install_default:
+  localai_default:
     external: true
 EOF
     log_success "Файл '$COMPOSE_FILE_PATH' успешно создан."
