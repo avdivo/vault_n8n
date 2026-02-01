@@ -25,21 +25,21 @@ WRAPPER_SCRIPT_NAME="vault.sh"
 
 # --- Функция для вывода сообщений ---
 log_info() {
-    echo "INFO: $1"
+    echo "INFO: "
 }
 
 log_success() {
-    echo "✅ SUCCESS: $1"
+    echo "✅ SUCCESS: "
 }
 
 log_error() {
-    echo "❌ ERROR: $1" >&2
+    echo "❌ ERROR: " >&2
     exit 1
 }
 
 # --- Функция для форматированного вывода данных в рамке ---
 display_generated_data_box() {
-    local title="$1"
+    local title=""
     local url="$2"
     local token_label="$3"
     local token_value="$4"
@@ -134,7 +134,7 @@ services:
         max-size: "1m"
         max-file: "1"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8000/docs || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/docs || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
