@@ -285,14 +285,16 @@ API использует стандартные HTTP-статус-коды дл�
 Авторизация настраивается один раз и используется для всех запросов.
 
 1. В узле `HTTP Request` выберите:
-   - **Authentication:** `Header Auth`
+  - **Authentication:** `Generic Credential Type`
+  - **Generic Auth Type:** `Header Auth`
+  - **Header Auth:** `Header Auth account`  
 2. Нажмите `Create New Credential`.
 3. В открывшемся окне:
-   - **Name:** `Authorization`
-   - **Value:** Вставьте `Bearer ваш_токен` (например, `Bearer my_secret_token_from_env_file`). **Важно:** Не забудьте написать слово `Bearer` и пробел перед самим токеном.
+  - **Name:** `Authorization`
+  - **Value:** Вставьте `Bearer ваш_токен` (например, `Bearer my_secret_token_from_env_file`). **Важно:** Не забудьте написать слово `Bearer` и пробел перед самим токеном.
 
 ### Примеры настройки узла HTTP Request
-
+    > ✨ **Внимание:** Для методов GET, DELETE параметры указываются в разделе `Send Query Parameters`, а для POST в `Send Body`.
 #### 1. Добавление/Обновление одного секрета
 
 - **Method:** `POST`
