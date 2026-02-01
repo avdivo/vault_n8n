@@ -2,20 +2,20 @@
 Тесты для модуля аутентификации `app.auth`.
 """
 import pytest
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.testclient import TestClient
 from app.auth import verify_token
 from app.config import Settings, get_settings
 
 # Фиктивный токен для тестов
-TEST_AUTH_TOKEN = "test-secret-token"
+TEST_VAULT_N8N_AUTH_TOKEN = "test-secret-token"
 
 # Переопределяем зависимость get_settings для тестов
 def override_get_settings() -> Settings:
     """
     Возвращает тестовые настройки с фиксированным токеном.
     """
-    return Settings(AUTH_TOKEN=TEST_AUTH_TOKEN, ENCRYPTION_KEY="0"*64)
+    return Settings(VAULT_N8N_AUTH_TOKEN=TEST_VAULT_N8N_AUTH_TOKEN, VAULT_N8N_ENCRYPTION_KEY="0"*64)
 
 # Создаем тестовое приложение FastAPI
 app = FastAPI()
@@ -40,7 +40,7 @@ def test_verify_token_success() -> None:
     """
     response = client.get(
         "/secure-endpoint",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"}
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"}
     )
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}

@@ -62,22 +62,22 @@ ensure_env_vars() {
         fi
     fi
 
-    # Проверяем наличие AUTH_TOKEN
-    AUTH_TOKEN_VALUE=$(grep -E "^AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2)
-    if [ -z "$AUTH_TOKEN_VALUE" ]; then
-        echo "INFO: AUTH_TOKEN не найден. Генерируется новый..."
-        AUTH_TOKEN=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(16))')
-        echo "AUTH_TOKEN=$AUTH_TOKEN" >> "$ENV_FILE"
-        display_token_box "AUTH_TOKEN" "$AUTH_TOKEN" "Сохраните этот токен! Он нужен для доступа к API."
+    # Проверяем наличие VAULT_N8N_AUTH_TOKEN
+    VAULT_N8N_AUTH_TOKEN_VALUE=$(grep -E "^VAULT_N8N_AUTH_TOKEN=" "$ENV_FILE" | cut -d '=' -f2)
+    if [ -z "$VAULT_N8N_AUTH_TOKEN_VALUE" ]; then
+        echo "INFO: VAULT_N8N_AUTH_TOKEN не найден. Генерируется новый..."
+        VAULT_N8N_AUTH_TOKEN=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(16))')
+        echo "VAULT_N8N_AUTH_TOKEN=$VAULT_N8N_AUTH_TOKEN" >> "$ENV_FILE"
+        display_token_box "VAULT_N8N_AUTH_TOKEN" "$VAULT_N8N_AUTH_TOKEN" "Сохраните этот токен! Он нужен для доступа к API."
     fi
 
-    # Проверяем наличие ENCRYPTION_KEY
-    ENCRYPTION_KEY_VALUE=$(grep -E "^ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2)
-    if [ -z "$ENCRYPTION_KEY_VALUE" ]; then
-        echo "INFO: ENCRYPTION_KEY не найден. Генерируется новый..."
-        ENCRYPTION_KEY=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(32))')
-        echo "ENCRYPTION_KEY=$ENCRYPTION_KEY" >> "$ENV_FILE"
-        display_token_box "ENCRYPTION_KEY" "$ENCRYPTION_KEY" "Сохраните этот ключ! Он нужен для шифрования данных. Без него вы потеряете все данные."
+    # Проверяем наличие VAULT_N8N_ENCRYPTION_KEY
+    VAULT_N8N_ENCRYPTION_KEY_VALUE=$(grep -E "^VAULT_N8N_ENCRYPTION_KEY=" "$ENV_FILE" | cut -d '=' -f2)
+    if [ -z "$VAULT_N8N_ENCRYPTION_KEY_VALUE" ]; then
+        echo "INFO: VAULT_N8N_ENCRYPTION_KEY не найден. Генерируется новый..."
+        VAULT_N8N_ENCRYPTION_KEY=$($PYTHON_CMD -c 'import secrets; print(secrets.token_hex(32))')
+        echo "VAULT_N8N_ENCRYPTION_KEY=$VAULT_N8N_ENCRYPTION_KEY" >> "$ENV_FILE"
+        display_token_box "VAULT_N8N_ENCRYPTION_KEY" "$VAULT_N8N_ENCRYPTION_KEY" "Сохраните этот ключ! Он нужен для шифрования данных. Без него вы потеряете все данные."
     fi
 }
 
@@ -89,7 +89,7 @@ echo "--- Запуск VaultN8N в режиме разработки ---"
 ensure_env_vars
 echo "INFO: Файл .env готов."
 echo "INFO: Важно! Сохраните сгенерированные токены/ключи из .env файла в безопасном месте."
-echo "INFO: Без ENCRYPTION_KEY вы не сможете расшифровать свои секреты!"
+echo "INFO: Без VAULT_N8N_ENCRYPTION_KEY вы не сможете расшифровать свои секреты!"
 
 # 2. Проверка и подготовка файла базы данных
 DB_FILE="secrets.db"

@@ -27,7 +27,7 @@ def verify_token(
     Исключения:
         HTTPException(401): Если токен невалиден или отсутствует.
     """
-    if not secrets.compare_digest(credentials.credentials, settings.AUTH_TOKEN):
+    if not secrets.compare_digest(credentials.credentials, settings.VAULT_N8N_AUTH_TOKEN):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверный токен аутентификации",

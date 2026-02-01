@@ -23,7 +23,7 @@ def create_or_update_secret(
     """
     try:
         # Шифруем значение перед сохранением
-        encrypted_value = crypto.encrypt_data(secret.value, settings.ENCRYPTION_KEY)
+        encrypted_value = crypto.encrypt_data(secret.value, settings.VAULT_N8N_ENCRYPTION_KEY)
         
         # Сохраняем в БД
         db.add_or_update_secret(settings.DATABASE_PATH, secret.key, encrypted_value)
@@ -49,7 +49,7 @@ def create_or_update_secrets_bulk(
     try:
         processed_secrets = []
         for secret in bulk_data:
-            encrypted_value = crypto.encrypt_data(secret.value, settings.ENCRYPTION_KEY)
+            encrypted_value = crypto.encrypt_data(secret.value, settings.VAULT_N8N_ENCRYPTION_KEY)
             db.add_or_update_secret(settings.DATABASE_PATH, secret.key, encrypted_value)
             processed_secrets.append(models.Secret(key=secret.key, value=secret.value))
             
@@ -86,7 +86,7 @@ def get_secrets(
             
         # Дешифруем значения
         decrypted_secrets = [
-            models.Secret(key=k, value=crypto.decrypt_data(v, settings.ENCRYPTION_KEY))
+            models.Secret(key=k, value=crypto.decrypt_data(v, settings.VAULT_N8N_ENCRYPTION_KEY))
             for k, v in found_secrets
         ]
         
@@ -134,7 +134,7 @@ def delete_secrets(
 
         # Дешифруем значения для ответа
         decrypted_secrets = [
-            models.Secret(key=k, value=crypto.decrypt_data(v, settings.ENCRYPTION_KEY))
+            models.Secret(key=k, value=crypto.decrypt_data(v, settings.VAULT_N8N_ENCRYPTION_KEY))
             for k, v in found_secrets
         ]
         

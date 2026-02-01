@@ -10,8 +10,8 @@ from app.crypto import decrypt_data, encrypt_data
 from pathlib import Path
 
 # Фиктивный токен для тестов
-TEST_AUTH_TOKEN = "test-api-secret-token"
-TEST_ENCRYPTION_KEY = "a" * 64  # 32-байтный ключ в hex
+TEST_VAULT_N8N_AUTH_TOKEN = "test-api-secret-token"
+TEST_VAULT_N8N_ENCRYPTION_KEY = "a" * 64  # 32-байтный ключ в hex
 
 @pytest.fixture
 def test_db_path(tmp_path: Path) -> Path:
@@ -27,8 +27,8 @@ def client(test_db_path: Path) -> TestClient:
     """
     # Создаем тестовые настройки
     test_settings = Settings(
-        AUTH_TOKEN=TEST_AUTH_TOKEN,
-        ENCRYPTION_KEY=TEST_ENCRYPTION_KEY,
+        VAULT_N8N_AUTH_TOKEN=TEST_VAULT_N8N_AUTH_TOKEN,
+        VAULT_N8N_ENCRYPTION_KEY=TEST_VAULT_N8N_ENCRYPTION_KEY,
         DATABASE_PATH=str(test_db_path),
     )
     # Устанавливаем настройки в app.state до запуска клиента
@@ -54,7 +54,7 @@ def test_create_secret_single(client: TestClient, test_db_path: Path) -> None:
 
     response = client.post(
         "/api/v1/secrets/single",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"},
         json={"key": secret_key, "value": secret_value},
     )
 
@@ -74,7 +74,7 @@ def test_create_secret_single(client: TestClient, test_db_path: Path) -> None:
     assert encrypted_value_from_db != secret_value
 
     # 3. Проверяем, что можем расшифровать данные из БД
-    decrypted_value = decrypt_data(encrypted_value_from_db, TEST_ENCRYPTION_KEY)
+    decrypted_value = decrypt_data(encrypted_value_from_db, TEST_VAULT_N8N_ENCRYPTION_KEY)
     assert decrypted_value == secret_value
 
 
@@ -99,7 +99,7 @@ def test_create_secrets_bulk(client: TestClient, test_db_path: Path) -> None:
 
     response = client.post(
         "/api/v1/secrets/bulk",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"},
         json=secrets_to_create,
     )
 
@@ -116,7 +116,7 @@ def test_create_secrets_bulk(client: TestClient, test_db_path: Path) -> None:
     for key, encrypted_value in secrets_from_db:
         original_value = next(s["value"] for s in secrets_to_create if s["key"] == key)
         assert encrypted_value != original_value
-        decrypted_value = decrypt_data(encrypted_value, TEST_ENCRYPTION_KEY)
+        decrypted_value = decrypt_data(encrypted_value, TEST_VAULT_N8N_ENCRYPTION_KEY)
         assert decrypted_value == original_value
 
 def test_get_secrets(client: TestClient, test_db_path: Path) -> None:
@@ -130,13 +130,13 @@ def test_get_secrets(client: TestClient, test_db_path: Path) -> None:
         "common-key": "commonValue",
     }
     for key, value in secrets_data.items():
-        encrypted_value = encrypt_data(value, TEST_ENCRYPTION_KEY) # Шифруем для записи в БД
+        encrypted_value = encrypt_data(value, TEST_VAULT_N8N_ENCRYPTION_KEY) # Шифруем для записи в БД
         add_or_update_secret(test_db_path, key, encrypted_value)
 
     # 2. Тестируем получение по точному ключу
     response = client.get(
         "/api/v1/secrets?keys=common-key",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -146,7 +146,7 @@ def test_get_secrets(client: TestClient, test_db_path: Path) -> None:
     # 3. Тестируем получение по шаблону
     response = client.get(
         "/api/v1/secrets?keys=service-*",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -159,7 +159,7 @@ def test_get_secrets(client: TestClient, test_db_path: Path) -> None:
     # 4. Тестируем комбинированный запрос
     response = client.get(
         "/api/v1/secrets?keys=service-A-token,common-key,non-existent",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -172,7 +172,7 @@ def test_get_secrets(client: TestClient, test_db_path: Path) -> None:
     # 5. Тестируем пустой результат
     response = client.get(
         "/api/v1/secrets?keys=non-existent",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"},
     )
     assert response.status_code == 200
     assert response.json() == []
@@ -189,13 +189,13 @@ def test_delete_secrets(client: TestClient, test_db_path: Path) -> None:
         "to-delete": "value-to-delete",
     }
     for key, value in secrets_data.items():
-        encrypted_value = encrypt_data(value, TEST_ENCRYPTION_KEY)
+        encrypted_value = encrypt_data(value, TEST_VAULT_N8N_ENCRYPTION_KEY)
         add_or_update_secret(test_db_path, key, encrypted_value)
 
     # 2. Удаляем по точному ключу
     response = client.delete(
         "/api/v1/secrets?keys=to-delete",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"},
     )
     assert response.status_code == 200
     deleted_data = response.json()
@@ -209,7 +209,7 @@ def test_delete_secrets(client: TestClient, test_db_path: Path) -> None:
     # 3. Удаляем по шаблону
     response = client.delete(
         "/api/v1/secrets?keys=service-*",
-        headers={"Authorization": f"Bearer {TEST_AUTH_TOKEN}"},
+        headers={"Authorization": f"Bearer {TEST_VAULT_N8N_AUTH_TOKEN}"},
     )
     assert response.status_code == 200
     deleted_data = response.json()

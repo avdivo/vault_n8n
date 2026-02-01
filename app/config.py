@@ -16,19 +16,19 @@ class Settings(BaseSettings):
     Загружает переменные из .env файла.
 
     Атрибуты:
-        AUTH_TOKEN (str): Токен для авторизации доступа к API.
-        ENCRYPTION_KEY (str): Ключ для шифрования данных (64-символьная hex-строка).
+        VAULT_N8N_AUTH_TOKEN (str): Токен для авторизации доступа к API.
+        VAULT_N8N_ENCRYPTION_KEY (str): Ключ для шифрования данных (64-символьная hex-строка).
         DATABASE_PATH (str): Путь к файлу базы данных SQLite.
     """
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
-    AUTH_TOKEN: str = Field(..., description="Токен для авторизации доступа к API")
-    ENCRYPTION_KEY: str = Field(..., description="Ключ шифрования (64-символьная hex-строка)")
+    VAULT_N8N_AUTH_TOKEN: str = Field(..., description="Токен для авторизации доступа к API")
+    VAULT_N8N_ENCRYPTION_KEY: str = Field(..., description="Ключ шифрования (64-символьная hex-строка)")
     DATABASE_PATH: str = Field("./secrets.db", description="Путь к файлу базы данных SQLite")
 
-    @field_validator("ENCRYPTION_KEY")
+    @field_validator("VAULT_N8N_ENCRYPTION_KEY")
     def validate_encryption_key(cls, value: str) -> str:
         """
         Валидирует ключ шифрования.

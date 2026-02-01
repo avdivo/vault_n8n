@@ -29,14 +29,14 @@ def check_encryption_key(settings: Settings):
 
     # Пытаемся дешифровать первое значение
     try:
-        decrypt_data(first_value, settings.ENCRYPTION_KEY)
+        decrypt_data(first_value, settings.VAULT_N8N_ENCRYPTION_KEY)
         logger.info("Ключ шифрования успешно проверен.")
     except DecryptionError as e:
         logger.critical("=" * 80)
         logger.critical("!!! КРИТИЧЕСКАЯ ОШИБКА ПРИ ЗАПУСКЕ !!!")
         logger.critical("Не удалось расшифровать данные из базы данных.")
         logger.critical(f"Ошибка: {e}")
-        logger.critical("Вероятная причина: используется неверный ENCRYPTION_KEY.")
+        logger.critical("Вероятная причина: используется неверный VAULT_N8N_ENCRYPTION_KEY.")
         logger.critical("Убедитесь, что в .env файле указан тот же ключ, которым были зашифрованы данные.")
         logger.critical("Приложение будет остановлено.")
         logger.critical("=" * 80)
