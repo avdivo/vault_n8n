@@ -58,7 +58,7 @@ display_generated_data_box() {
     printf "| %-76s |\n" "✅ Интеграция $title завершена!"
     echo "$border_line"
     printf "| %-76s |\n" " "
-    printf "| %-76s |\n" "URL для доступа: $url"
+    # printf "| %-76s |\n" "URL для доступа: $url"
     printf "| %-76s |\n" " "
     printf "| %-76s |\n" "Сохраните эти данные! Они не будут показаны снова:"
     printf "| %-76s |\n" "  -> $token_label: $token_value"
