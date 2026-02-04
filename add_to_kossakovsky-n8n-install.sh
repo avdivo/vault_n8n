@@ -11,6 +11,7 @@
 # 6. Выводит сгенерированные данные и УПРОЩЕННЫЕ инструкции по запуску.
 #
 # Скрипт идемпотентен: безопасен для повторного запуска.
+# Официальная информация по интеграции: https://github.com/kossakovsky/n8n-install/blob/main/.claude/commands/add-new-service.md
 # ==============================================================================
 
 set -e # Exit immediately if a command exits with a non-zero status.
@@ -166,37 +167,37 @@ EOF
     log_success "Файл '$COMPOSE_FILE_PATH' успешно создан."
     
     # 6. Модификация Caddyfile (с проверкой на существование)
-    if grep -q "reverse_proxy $SERVICE_NAME:8000" "$CADDY_FILE"; then
-        log_info "Конфигурация для '$SERVICE_NAME' уже существует в $CADDY_FILE. Пропускаем..."
-    else
-        log_info "Обновление файла '$CADDY_FILE'..."
-        # Create the text to be inserted. Note the escaped dollar sign for Caddy's variable.
-        CADDY_INSERT=$(cat <<END_CADDY
-
-# $SERVICE_NAME
-{\$VAULT_N8N_HOSTNAME} {
-    reverse_proxy $SERVICE_NAME:8000
-}
-END_CADDY
-)
-        # Use awk to insert the block before the line containing "# SearXNG"
-        if grep -q "# SearXNG" "$CADDY_FILE"; then
-            awk -v block="$CADDY_INSERT" '
-            /# SearXNG/ && !p {
-                print block;
-                print "";
-                p=1
-            }
-            {
-                print
-            }' "$CADDY_FILE" > "${CADDY_FILE}.tmp" && mv "${CADDY_FILE}.tmp" "$CADDY_FILE"
-            log_success "Конфигурация для '$SERVICE_NAME' добавлена в '$CADDY_FILE'."
-        else
-            log_info "Не удалось найти блок '# SearXNG', добавляем конфигурацию в конец файла."
-            printf '%s\n\n' "$CADDY_INSERT" >> "$CADDY_FILE"
-            log_success "Конфигурация для '$SERVICE_NAME' добавлена в конец '$CADDY_FILE'."
-        fi
-    fi
+    # if grep -q "reverse_proxy $SERVICE_NAME:8000" "$CADDY_FILE"; then
+    #     log_info "Конфигурация для '$SERVICE_NAME' уже существует в $CADDY_FILE. Пропускаем..."
+    # else
+    #     log_info "Обновление файла '$CADDY_FILE'..."
+    #     # Create the text to be inserted. Note the escaped dollar sign for Caddy's variable.
+    #     CADDY_INSERT=$(cat <<END_CADDY
+    # 
+    # # $SERVICE_NAME
+    # {\$VAULT_N8N_HOSTNAME} {
+    #     reverse_proxy $SERVICE_NAME:8000
+    # }
+    # END_CADDY
+    # )
+    #     # Use awk to insert the block before the line containing "# SearXNG"
+    #     if grep -q "# SearXNG" "$CADDY_FILE"; then
+    #         awk -v block="$CADDY_INSERT" '
+    #         /# SearXNG/ && !p {
+    #             print block;
+    #             print "";
+    #             p=1
+    #         }
+    #         {
+    #             print
+    #         }' "$CADDY_FILE" > "${CADDY_FILE}.tmp" && mv "${CADDY_FILE}.tmp" "$CADDY_FILE"
+    #         log_success "Конфигурация для '$SERVICE_NAME' добавлена в '$CADDY_FILE'."
+    #     else
+    #         log_info "Не удалось найти блок '# SearXNG', добавляем конфигурацию в конец файла."
+    #         printf '%s\n\n' "$CADDY_INSERT" >> "$CADDY_FILE"
+    #         log_success "Конфигурация для '$SERVICE_NAME' добавлена в конец '$CADDY_FILE'."
+    #     fi
+    # fi
 
     # 7. Создание управляющего скрипта-обертки
     log_info "Создание управляющего скрипта ./$WRAPPER_SCRIPT_NAME для удобства..."
@@ -232,7 +233,7 @@ EOW
         "./$WRAPPER_SCRIPT_NAME up -d" \
         "./$WRAPPER_SCRIPT_NAME down"
 
-    log_info "Не забудьте перезапустить Caddy, чтобы применить изменения: docker compose up -d --force-recreate caddy"
+    # log_info "Не забудьте перезапустить Caddy, чтобы применить изменения: docker compose up -d --force-recreate caddy"
 }
 
 # Вызов основной функции
